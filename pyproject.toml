@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "instruktai-python-logger"
-version = "0.1.0"
+version = "0.1.1"
 description = "Centralized logging utilities for InstruktAI Python services."
 readme = "README.md"
 requires-python = ">=3.11"

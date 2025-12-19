@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from instrukt_ai_logging import configure_logging, log_kv
+from instrukt_ai_logging import configure_logging, get_logger
 
 
 @pytest.fixture()
@@ -36,9 +36,8 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
         monkeypatch.delenv("TELECLAUDE_THIRD_PARTY_LOGGERS", raising=False)
 
         log_path = configure_logging(
-            env_prefix="TELECLAUDE",
             app_logger_prefix="teleclaude",
-            app_name="teleclaude",
+            name="teleclaude",
         )
 
         logging.getLogger("teleclaude.core").debug("hello from ours")
@@ -58,9 +57,8 @@ def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatc
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOGGERS", "httpcore")
 
         log_path = configure_logging(
-            env_prefix="TELECLAUDE",
             app_logger_prefix="teleclaude",
-            app_name="teleclaude",
+            name="teleclaude",
         )
 
         # Ensure records are actually created even though root is WARNING in spotlight mode.
@@ -85,39 +83,19 @@ def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatc
         assert "telegram info" not in content
 
 
-def test_log_kv_requires_msg_key(isolated_logging, monkeypatch):
-    with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
-        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
-        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
-
-        configure_logging(
-            env_prefix="TELECLAUDE",
-            app_logger_prefix="teleclaude",
-            app_name="teleclaude",
-        )
-
-        with pytest.raises(ValueError):
-            log_kv(logging.getLogger("teleclaude.core"), logging.INFO, {"session": "abc"})
-
-
-def test_log_kv_emits_pairs(isolated_logging, monkeypatch):
+def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
     with TemporaryDirectory() as tmp:
         monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
 
         log_path = configure_logging(
-            env_prefix="TELECLAUDE",
             app_logger_prefix="teleclaude",
-            app_name="teleclaude",
+            name="teleclaude",
         )
 
-        log_kv(
-            logging.getLogger("teleclaude.core"),
-            logging.INFO,
-            {"msg": "hello", "session": "abc123", "n": 1},
-        )
+        logger = get_logger("teleclaude.core")
+        logger.info("hello", session="abc123", n=1)
 
         content = _read_text(log_path)
         assert 'msg="hello"' in content

@@ -12,6 +12,30 @@ from pathlib import Path
 from typing import Any
 
 
+def _normalize_env_prefix(name: str) -> str:
+    # TELECLAUDE, MY_APP, etc.
+    raw = name.strip().upper()
+    if not raw:
+        raise ValueError("name must be non-empty")
+    raw = re.sub(r"[^A-Z0-9]+", "_", raw)
+    raw = re.sub(r"_+", "_", raw).strip("_")
+    if not raw:
+        raise ValueError("name did not produce a valid env prefix")
+    return raw
+
+
+def _normalize_app_name(name: str) -> str:
+    # teleclaude, my-app, etc.
+    raw = name.strip().lower()
+    if not raw:
+        raise ValueError("name must be non-empty")
+    raw = re.sub(r"[^a-z0-9]+", "-", raw)
+    raw = re.sub(r"-+", "-", raw).strip("-")
+    if not raw:
+        raise ValueError("name did not produce a valid app name")
+    return raw
+
+
 def _level_name_to_int(level_name: str, default: int) -> int:
     name = level_name.strip().upper()
     if not name:
@@ -143,24 +167,60 @@ class LogfmtFormatter(UtcMillisFormatter):
         return " ".join(parts)
 
 
-def log_kv(logger: logging.Logger, level: int, data: Mapping[str, Any]) -> None:
-    """Log a key/value event.
-
-    `data` MUST include `msg` and may include any other serializable values.
-    """
-    if "msg" not in data:
-        raise ValueError('log_kv requires a "msg" key')
-
-    msg = str(data["msg"])
-    kv: dict[str, object] = {}
-    for key, value in data.items():
+def _log_kv(logger: logging.Logger, level: int, msg: str, kv: Mapping[str, Any]) -> None:
+    """Internal helper: attach `kv` pairs without forcing callers to use `extra`."""
+    safe: dict[str, object] = {}
+    for key, value in kv.items():
+        if not isinstance(key, str):
+            continue
         if key == "msg":
             continue
         if not _SAFE_KEY.fullmatch(key):
-            raise ValueError(f"Invalid key for log_kv: {key!r}")
-        kv[key] = value
+            continue
+        safe[key] = value
 
-    logger.log(level, msg, extra={"kv": kv})
+    logger.log(level, msg, extra={"kv": safe})
+
+
+class KVLogger:
+    """Ergonomic key/value logger.
+
+    Callers use `KVLogger` like a normal logger:
+      logger.info("event_name", job_id=..., user_id=...)
+
+    This keeps call sites human-friendly while still producing strict logfmt pairs.
+    """
+
+    def __init__(self, logger: logging.Logger) -> None:
+        self._logger = logger
+
+    @property
+    def name(self) -> str:
+        return self._logger.name
+
+    def debug(self, msg: str, **kv: Any) -> None:
+        _log_kv(self._logger, logging.DEBUG, msg, kv)
+
+    def info(self, msg: str, **kv: Any) -> None:
+        _log_kv(self._logger, logging.INFO, msg, kv)
+
+    def warning(self, msg: str, **kv: Any) -> None:
+        _log_kv(self._logger, logging.WARNING, msg, kv)
+
+    def error(self, msg: str, **kv: Any) -> None:
+        _log_kv(self._logger, logging.ERROR, msg, kv)
+
+    def exception(self, msg: str, **kv: Any) -> None:
+        # Match logging.exception behavior (includes exc_info=True).
+        self._logger.exception(msg, extra={"kv": {k: v for k, v in kv.items() if _SAFE_KEY.fullmatch(k)}})
+
+    def log(self, level: int, msg: str, **kv: Any) -> None:
+        _log_kv(self._logger, level, msg, kv)
+
+
+def get_logger(name: str) -> KVLogger:
+    """Return a `KVLogger` wrapper for the named logger."""
+    return KVLogger(logging.getLogger(name))
 
 
 class _ThirdPartySelectorFilter(logging.Filter):
@@ -226,9 +286,10 @@ def _ensure_log_dir(log_dir: Path) -> None:
 
 def configure_logging(
     *,
-    env_prefix: str,
     app_logger_prefix: str,
-    app_name: str,
+    name: str | None = None,
+    env_prefix: str | None = None,
+    app_name: str | None = None,
     log_filename: str | None = None,
     max_message_chars: int = 4000,
 ) -> Path:
@@ -236,6 +297,15 @@ def configure_logging(
 
     Returns the resolved log file path in use.
     """
+    if name is not None:
+        if env_prefix is not None or app_name is not None:
+            raise ValueError("Pass either name= OR env_prefix/app_name (not both)")
+        env_prefix = _normalize_env_prefix(name)
+        app_name = _normalize_app_name(name)
+
+    if env_prefix is None or app_name is None:
+        raise ValueError("Missing required config: name= OR both env_prefix= and app_name=")
+
     contract = LoggingContract(
         env_prefix=env_prefix,
         app_logger_prefix=app_logger_prefix,

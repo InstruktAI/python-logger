@@ -24,8 +24,18 @@ pip install git+ssh://git@github.com/InstruktAI/python-logger.git
 ## API
 
 - Python entrypoint: `instrukt_ai_logging.configure_logging(...)`
-- Structured logging helper: `instrukt_ai_logging.log_kv(logger, level, {"msg": "...", ...})`
+- Logger helper: `instrukt_ai_logging.get_logger(name)` (named `**kv` logging)
 - CLI entrypoint: `instrukt-ai-logs` (reads recent log lines)
+
+Example:
+
+```py
+from instrukt_ai_logging import configure_logging, get_logger
+
+configure_logging(name="teleclaude", app_logger_prefix="teleclaude")
+logger = get_logger("teleclaude.core")
+logger.info("job_started", job_id="abc123")
+```
 
 ## Environment variables (contract)
 
