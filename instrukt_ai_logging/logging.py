@@ -4,10 +4,12 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
+from typing import Any
 
 
 def _level_name_to_int(level_name: str, default: int) -> int:
@@ -36,39 +38,129 @@ class UtcMillisFormatter(logging.Formatter):
         return dt.strftime("%Y-%m-%dT%H:%M:%S") + f".{int(record.msecs):03d}Z"
 
 
-class RedactAndTruncateFilter(logging.Filter):
-    def __init__(self, max_chars: int) -> None:
-        super().__init__()
-        self.max_chars = max_chars
+_SAFE_BARE_VALUE = re.compile(r"^[A-Za-z0-9._/:+-]+$")
+_SAFE_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
 
-        # Keep this small and high-signal; expand only with strong justification.
-        self._patterns: list[tuple[re.Pattern[str], str]] = [
-            # Telegram bot token in API URLs: https://api.telegram.org/bot<token>/...
-            (re.compile(r"(api\\.telegram\\.org/bot)([^/\\s]+)"), r"\\1<REDACTED>"),
-            # Generic Bearer token
-            (re.compile(r"\\bBearer\\s+[^\\s]+"), "Bearer <REDACTED>"),
-            # Common OpenAI-style key prefix (avoid leaking)
-            (re.compile(r"\\bsk-[A-Za-z0-9]{10,}\\b"), "sk-<REDACTED>"),
-        ]
+# Keep this small and high-signal; expand only with strong justification.
+_REDACTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # Telegram bot token in API URLs: https://api.telegram.org/bot<token>/...
+    (re.compile(r"(api\\.telegram\\.org/bot)([^/\\s]+)"), r"\\1<REDACTED>"),
+    # Generic Bearer token
+    (re.compile(r"\\bBearer\\s+[^\\s]+"), "Bearer <REDACTED>"),
+    # Common OpenAI-style key prefix (avoid leaking)
+    (re.compile(r"\\bsk-[A-Za-z0-9]{10,}\\b"), "sk-<REDACTED>"),
+]
 
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+
+def _redact_text(text: str) -> str:
+    redacted = text
+    for pattern, replacement in _REDACTION_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    if max_chars > 0 and len(text) > max_chars:
+        return text[:max_chars] + "…(truncated)"
+    return text
+
+
+def _escape_quotes(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
+
+
+def _format_logfmt_value(value: object, *, max_chars: int) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    text = _redact_text(str(value))
+    text = _truncate_text(text, max_chars=max_chars)
+
+    if _SAFE_BARE_VALUE.fullmatch(text):
+        return text
+    return f'"{_escape_quotes(text)}"'
+
+
+def _format_logfmt_string(text: str, *, max_chars: int, force_quote: bool) -> str:
+    redacted = _redact_text(text)
+    redacted = _truncate_text(redacted, max_chars=max_chars)
+    if not force_quote and _SAFE_BARE_VALUE.fullmatch(redacted):
+        return redacted
+    return f'"{_escape_quotes(redacted)}"'
+
+
+class LogfmtFormatter(UtcMillisFormatter):
+    """Single-line logfmt-ish formatter.
+
+    Always emits key/value pairs with at least:
+      level=..., logger=..., msg="..."
+
+    Optional additional pairs can be attached via `extra={"kv": {...}}`.
+    """
+
+    def __init__(self, max_message_chars: int) -> None:
+        super().__init__(datefmt=None)
+        self.max_message_chars = max_message_chars
+
+    def format(self, record: logging.LogRecord) -> str:
+        ts = self.formatTime(record)
         try:
             message = record.getMessage()
         except Exception:
-            return True
+            message = "<unprintable>"
 
-        redacted = message
-        for pattern, replacement in self._patterns:
-            redacted = pattern.sub(replacement, redacted)
+        parts = [
+            ts,
+            f"level={_format_logfmt_value(record.levelname, max_chars=self.max_message_chars)}",
+            f"logger={_format_logfmt_value(record.name, max_chars=self.max_message_chars)}",
+            f"msg={_format_logfmt_string(str(message), max_chars=self.max_message_chars, force_quote=True)}",
+        ]
 
-        if self.max_chars > 0 and len(redacted) > self.max_chars:
-            redacted = redacted[: self.max_chars] + "…(truncated)"
+        kv: object = getattr(record, "kv", None)
+        if isinstance(kv, dict):
+            for key in sorted(kv.keys(), key=lambda x: str(x)):
+                if key == "msg":
+                    continue
+                if not isinstance(key, str):
+                    continue
+                if not _SAFE_KEY.fullmatch(key):
+                    continue
+                parts.append(
+                    f"{key}={_format_logfmt_value(kv[key], max_chars=self.max_message_chars)}"
+                )
 
-        if redacted != message:
-            record.msg = redacted
-            record.args = ()
+        if record.exc_info:
+            try:
+                exc_text = self.formatException(record.exc_info).replace("\n", "\\n")
+            except Exception:
+                exc_text = "<exception>"
+            parts.append(f"exc={_format_logfmt_value(exc_text, max_chars=self.max_message_chars)}")
 
-        return True
+        return " ".join(parts)
+
+
+def log_kv(logger: logging.Logger, level: int, data: Mapping[str, Any]) -> None:
+    """Log a key/value event.
+
+    `data` MUST include `msg` and may include any other serializable values.
+    """
+    if "msg" not in data:
+        raise ValueError('log_kv requires a "msg" key')
+
+    msg = str(data["msg"])
+    kv: dict[str, object] = {}
+    for key, value in data.items():
+        if key == "msg":
+            continue
+        if not _SAFE_KEY.fullmatch(key):
+            raise ValueError(f"Invalid key for log_kv: {key!r}")
+        kv[key] = value
+
+    logger.log(level, msg, extra={"kv": kv})
 
 
 class _ThirdPartySelectorFilter(logging.Filter):
@@ -169,12 +261,11 @@ def configure_logging(
 
     log_file = log_dir / (log_filename or f"{app_name}.log")
 
-    formatter = UtcMillisFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    formatter = LogfmtFormatter(max_message_chars=max_message_chars)
 
     handler = WatchedFileHandler(log_file, encoding="utf-8")
     handler.setLevel(logging.NOTSET)
     handler.setFormatter(formatter)
-    handler.addFilter(RedactAndTruncateFilter(max_chars=max_message_chars))
     handler.addFilter(
         _ThirdPartySelectorFilter(
             app_logger_prefix=app_logger_prefix, spotlight_prefixes=tuple(spotlight)
@@ -199,7 +290,6 @@ def configure_logging(
         console = logging.StreamHandler()
         console.setLevel(logging.NOTSET)
         console.setFormatter(formatter)
-        console.addFilter(RedactAndTruncateFilter(max_chars=max_message_chars))
         console.addFilter(
             _ThirdPartySelectorFilter(
                 app_logger_prefix=app_logger_prefix,

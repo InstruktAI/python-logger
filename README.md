@@ -17,6 +17,7 @@ pip install -e /Users/morriz/Workspace/InstruktAI/python-logger
 ## API
 
 - Python entrypoint: `instrukt_ai_logging.configure_logging(...)`
+- Structured logging helper: `instrukt_ai_logging.log_kv(logger, level, {"msg": "...", ...})`
 - CLI entrypoint: `instrukt-ai-logs` (reads recent log lines)
 
 ## Environment variables (contract)
