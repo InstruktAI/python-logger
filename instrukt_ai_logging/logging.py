@@ -317,9 +317,6 @@ def _ensure_log_dir(log_dir: Path) -> None:
 def configure_logging(
     name: str,
     *,
-    app_logger_prefix: str | None = None,
-    env_prefix: str | None = None,
-    app_name: str | None = None,
     log_filename: str | None = None,
     max_message_chars: int = 4000,
 ) -> Path:
@@ -327,9 +324,9 @@ def configure_logging(
 
     Returns the resolved log file path in use.
     """
-    env_prefix = env_prefix or _normalize_env_prefix(name)
-    app_logger_prefix = app_logger_prefix or _normalize_logger_prefix(name)
-    app_name = app_name or app_logger_prefix
+    env_prefix = _normalize_env_prefix(name)
+    app_logger_prefix = _normalize_logger_prefix(name)
+    app_name = app_logger_prefix
     log_filename = log_filename or f"{app_logger_prefix}.log"
 
     contract = LoggingContract(
