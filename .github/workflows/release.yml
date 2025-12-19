@@ -1,0 +1,105 @@
+name: Release (Auto)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  models: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stop if this is a release commit
+        run: |
+          set -euo pipefail
+          MSG="$(git log -1 --pretty=%s)"
+          case "$MSG" in
+            chore\(release\):* ) echo "Release commit detected; skipping." ; exit 0 ;;
+          esac
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dev deps
+        run: uv sync --extra dev
+
+      - name: Lint + tests
+        run: |
+          set -euo pipefail
+          uv run -m ruff check .
+          uv run -m pytest
+
+      - name: Collect commits since last tag
+        id: commits
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          LAST_TAG="$(git tag --list 'v*' --sort=-version:refname | head -n1 || true)"
+          if [ -n "${LAST_TAG}" ]; then
+            git log "${LAST_TAG}..HEAD" --pretty=format:'- %s%n%b%n' > commits.txt
+          else
+            git log HEAD --pretty=format:'- %s%n%b%n' > commits.txt
+          fi
+          echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: AI decides bump + release notes
+        id: ai
+        uses: actions/ai-inference@v1
+        with:
+          prompt-file: ./.github/prompts/release-bump.prompt.yml
+          file_input: |
+            commits=./commits.txt
+
+      - name: Extract bump + notes
+        id: decision
+        run: |
+          set -euo pipefail
+          echo '${{ steps.ai.outputs.response }}' > ai.json
+          BUMP="$(jq -r '.bump // "minor"' ai.json)"
+          if [ "${BUMP}" != "minor" ] && [ "${BUMP}" != "patch" ]; then
+            BUMP="minor"
+          fi
+          jq -r '.notes_markdown // ""' ai.json > release-notes.md
+          echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version in pyproject.toml
+        id: bump
+        run: |
+          set -euo pipefail
+          uv version --bump "${{ steps.decision.outputs.bump }}" --frozen
+          echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
+
+      - name: Commit + tag
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin HEAD:main --tags
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          body_path: release-notes.md

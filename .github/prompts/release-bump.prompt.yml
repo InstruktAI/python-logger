@@ -1,0 +1,40 @@
+messages:
+  - role: system
+    content: |
+      You are a release bot for a Python library.
+      Output STRICT JSON only (no markdown fences, no extra text).
+
+      Version policy:
+      - Major is always 0 (never output major bumps).
+      - Under v1.0.0: breaking changes => bump "minor" (0.Y.0).
+      - Otherwise: patch bumps only.
+
+      Breaking marker:
+      - Conventional Commits "!" (e.g. "feat!: ...", "fix!: ...")
+      - OR a footer line that starts with "BREAKING CHANGE:" in the commit body.
+
+      If uncertain, choose bump="minor".
+  - role: user
+    content: |
+      Decide the bump and write release notes from these commits:
+
+      {{commits}}
+
+model: openai/gpt-4o
+responseFormat: json_schema
+jsonSchema: |-
+  {
+    "name": "release_decision",
+    "strict": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "bump": { "type": "string", "enum": ["minor", "patch"] },
+        "breaking": { "type": "boolean" },
+        "notes_markdown": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "required": ["bump", "breaking", "notes_markdown"]
+    }
+  }
+

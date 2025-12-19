@@ -12,6 +12,8 @@ permissions:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    environment: pypi
+    if: ${{ vars.PYPI_PUBLISH_ENABLED == 'true' }}
     permissions:
       id-token: write
       contents: read

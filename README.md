@@ -1,6 +1,6 @@
-# `instruktai-python-logger`
+# Instrukt AI's Python Logger`
 
-Centralized logging utilities for InstruktAI Python services.
+Centralized logging utilities for Python services.
 
 This repo provides a shared, consistent logging contract (env vars + output format + log location) intended to keep logs highly queryable (including by AIs that only read a tail window).
 
@@ -57,3 +57,19 @@ Default target:
 - `/var/log/instrukt-ai/{app}/{app}.log`
 
 The installer for each service is expected to create the directory and set write permissions for the daemon user. If the default location is not writable, the implementation will fall back to a user-writable directory and/or require `INSTRUKT_AI_LOG_ROOT`.
+
+## CLI
+
+```bash
+# Last 10 minutes (default), follows
+instrukt-ai-logs teleclaude -f
+
+# Last 2 hours
+instrukt-ai-logs teleclaude --since 2h
+
+# Filter with regex
+instrukt-ai-logs teleclaude --since 10m --grep 'logger=teleclaude'
+
+# Follow (tail -f style) after printing the --since window
+instrukt-ai-logs teleclaude --since 10m --follow
+```
