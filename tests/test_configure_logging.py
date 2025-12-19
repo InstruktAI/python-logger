@@ -36,7 +36,6 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
         monkeypatch.delenv("TELECLAUDE_THIRD_PARTY_LOGGERS", raising=False)
 
         log_path = configure_logging(
-            app_logger_prefix="teleclaude",
             name="teleclaude",
         )
 
@@ -57,7 +56,6 @@ def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatc
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOGGERS", "httpcore")
 
         log_path = configure_logging(
-            app_logger_prefix="teleclaude",
             name="teleclaude",
         )
 
@@ -90,7 +88,6 @@ def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
 
         log_path = configure_logging(
-            app_logger_prefix="teleclaude",
             name="teleclaude",
         )
 

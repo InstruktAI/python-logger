@@ -35,6 +35,18 @@ def _normalize_app_name(name: str) -> str:
     return raw
 
 
+def _normalize_logger_prefix(name: str) -> str:
+    # teleclaude, crypto_ai, etc. (match Python package style)
+    raw = name.strip().lower()
+    if not raw:
+        raise ValueError("name must be non-empty")
+    raw = re.sub(r"[^a-z0-9]+", "_", raw)
+    raw = re.sub(r"_+", "_", raw).strip("_")
+    if not raw:
+        raise ValueError("name did not produce a valid logger prefix")
+    return raw
+
+
 def _level_name_to_int(level_name: str, default: int) -> int:
     name = level_name.strip().upper()
     if not name:
@@ -304,8 +316,8 @@ def _ensure_log_dir(log_dir: Path) -> None:
 
 def configure_logging(
     *,
-    app_logger_prefix: str,
     name: str | None = None,
+    app_logger_prefix: str | None = None,
     env_prefix: str | None = None,
     app_name: str | None = None,
     log_filename: str | None = None,
@@ -320,9 +332,13 @@ def configure_logging(
             raise ValueError("Pass either name= OR env_prefix/app_name (not both)")
         env_prefix = _normalize_env_prefix(name)
         app_name = _normalize_app_name(name)
+        if app_logger_prefix is None:
+            app_logger_prefix = _normalize_logger_prefix(name)
 
-    if env_prefix is None or app_name is None:
-        raise ValueError("Missing required config: name= OR both env_prefix= and app_name=")
+    if env_prefix is None or app_name is None or app_logger_prefix is None:
+        raise ValueError(
+            "Missing required config: name= (preferred) OR env_prefix/app_name/app_logger_prefix"
+        )
 
     contract = LoggingContract(
         env_prefix=env_prefix,
