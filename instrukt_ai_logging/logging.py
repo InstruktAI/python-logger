@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import sys
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging.handlers import WatchedFileHandler
@@ -167,60 +166,79 @@ class LogfmtFormatter(UtcMillisFormatter):
         return " ".join(parts)
 
 
-def _log_kv(logger: logging.Logger, level: int, msg: str, kv: Mapping[str, Any]) -> None:
-    """Internal helper: attach `kv` pairs without forcing callers to use `extra`."""
-    safe: dict[str, object] = {}
-    for key, value in kv.items():
-        if not isinstance(key, str):
-            continue
-        if key == "msg":
-            continue
-        if not _SAFE_KEY.fullmatch(key):
-            continue
-        safe[key] = value
+class InstruktLogger(logging.Logger):
+    """Logger that accepts arbitrary `**kv` fields.
 
-    logger.log(level, msg, extra={"kv": safe})
+    This lets callers use normal logger methods with named key/value pairs:
+      logging.getLogger("...").info("event_name", job_id=..., user_id=...)
 
-
-class KVLogger:
-    """Ergonomic key/value logger.
-
-    Callers use `KVLogger` like a normal logger:
-      logger.info("event_name", job_id=..., user_id=...)
-
-    This keeps call sites human-friendly while still producing strict logfmt pairs.
+    All `**kv` values are serialized to text by the formatter.
     """
 
-    def __init__(self, logger: logging.Logger) -> None:
-        self._logger = logger
+    def _log_with_kv(self, level: int, msg: object, args: tuple[object, ...], **kwargs: Any) -> None:
+        exc_info = kwargs.pop("exc_info", None)
+        stack_info = kwargs.pop("stack_info", False)
+        stacklevel = kwargs.pop("stacklevel", 1)
+        extra = kwargs.pop("extra", None)
 
-    @property
-    def name(self) -> str:
-        return self._logger.name
+        # Remaining kwargs are treated as `kv`.
+        kv: dict[str, object] = {k: v for k, v in kwargs.items() if _SAFE_KEY.fullmatch(k)}
 
-    def debug(self, msg: str, **kv: Any) -> None:
-        _log_kv(self._logger, logging.DEBUG, msg, kv)
+        merged_extra: dict[str, object] = {}
+        if isinstance(extra, dict):
+            merged_extra.update(extra)
 
-    def info(self, msg: str, **kv: Any) -> None:
-        _log_kv(self._logger, logging.INFO, msg, kv)
+        existing_kv = merged_extra.get("kv")
+        if isinstance(existing_kv, dict):
+            merged_extra["kv"] = {**existing_kv, **kv}
+        else:
+            merged_extra["kv"] = kv
 
-    def warning(self, msg: str, **kv: Any) -> None:
-        _log_kv(self._logger, logging.WARNING, msg, kv)
+        super()._log(
+            level,
+            msg,
+            args,
+            exc_info=exc_info,
+            extra=merged_extra,
+            stack_info=stack_info,
+            stacklevel=stacklevel,
+        )
 
-    def error(self, msg: str, **kv: Any) -> None:
-        _log_kv(self._logger, logging.ERROR, msg, kv)
+    def debug(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.isEnabledFor(logging.DEBUG):
+            self._log_with_kv(logging.DEBUG, msg, args, **kwargs)
 
-    def exception(self, msg: str, **kv: Any) -> None:
-        # Match logging.exception behavior (includes exc_info=True).
-        self._logger.exception(msg, extra={"kv": {k: v for k, v in kv.items() if _SAFE_KEY.fullmatch(k)}})
+    def info(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.isEnabledFor(logging.INFO):
+            self._log_with_kv(logging.INFO, msg, args, **kwargs)
 
-    def log(self, level: int, msg: str, **kv: Any) -> None:
-        _log_kv(self._logger, level, msg, kv)
+    def warning(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.isEnabledFor(logging.WARNING):
+            self._log_with_kv(logging.WARNING, msg, args, **kwargs)
+
+    def error(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.isEnabledFor(logging.ERROR):
+            self._log_with_kv(logging.ERROR, msg, args, **kwargs)
+
+    def critical(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.isEnabledFor(logging.CRITICAL):
+            self._log_with_kv(logging.CRITICAL, msg, args, **kwargs)
+
+    def exception(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        kwargs.setdefault("exc_info", True)
+        if self.isEnabledFor(logging.ERROR):
+            self._log_with_kv(logging.ERROR, msg, args, **kwargs)
+
+    def log(self, level: int, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+        if not isinstance(level, int):
+            raise TypeError("level must be an int")
+        if self.isEnabledFor(level):
+            self._log_with_kv(level, msg, args, **kwargs)
 
 
-def get_logger(name: str) -> KVLogger:
-    """Return a `KVLogger` wrapper for the named logger."""
-    return KVLogger(logging.getLogger(name))
+def get_logger(name: str) -> logging.Logger:
+    """Compatibility helper (returns a normal logger, but with `**kv` support after configuration)."""
+    return logging.getLogger(name)
 
 
 class _ThirdPartySelectorFilter(logging.Filter):
@@ -311,6 +329,12 @@ def configure_logging(
         app_logger_prefix=app_logger_prefix,
         app_name=app_name,
     )
+
+    # Ensure all loggers accept arbitrary `**kv` (no wrapper at call sites).
+    logging.setLoggerClass(InstruktLogger)
+    for obj in logging.root.manager.loggerDict.values():
+        if isinstance(obj, logging.Logger) and not isinstance(obj, InstruktLogger):
+            obj.__class__ = InstruktLogger
 
     our_level_name = (os.getenv(contract.env_log_level) or "INFO").upper()
     third_party_level_name = (os.getenv(contract.env_third_party_level) or "WARNING").upper()

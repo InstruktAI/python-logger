@@ -30,11 +30,12 @@ pip install git+ssh://git@github.com/InstruktAI/python-logger.git
 Example:
 
 ```py
-from instrukt_ai_logging import configure_logging, get_logger
+import logging
+from instrukt_ai_logging import configure_logging
 
 configure_logging(name="teleclaude", app_logger_prefix="teleclaude")
-logger = get_logger("teleclaude.core")
-logger.info("job_started", job_id="abc123")
+logger = logging.getLogger("teleclaude.core")
+logger.info("job_started", job_id="abc123", user_id=123)
 ```
 
 ## Environment variables (contract)

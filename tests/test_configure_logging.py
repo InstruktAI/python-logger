@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from instrukt_ai_logging import configure_logging, get_logger
+from instrukt_ai_logging import configure_logging
 
 
 @pytest.fixture()
@@ -94,8 +94,7 @@ def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
             name="teleclaude",
         )
 
-        logger = get_logger("teleclaude.core")
-        logger.info("hello", session="abc123", n=1)
+        logging.getLogger("teleclaude.core").info("hello", session="abc123", n=1)
 
         content = _read_text(log_path)
         assert 'msg="hello"' in content
