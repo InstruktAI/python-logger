@@ -5,6 +5,7 @@ Centralized logging utilities for InstruktAI Python services.
 This repo provides a shared, consistent logging contract (env vars + output format + log location) intended to keep logs highly queryable (including by AIs that only read a tail window).
 
 Background and rationale live in `docs/design.md`.
+Publishing notes live in `docs/publishing.md`.
 
 ## Install (editable, local workspace)
 
