@@ -8,10 +8,16 @@ Background and rationale live in `docs/design.md`.
 
 ## Install (editable, local workspace)
 
-From a service repo:
+From PyPI (recommended):
 
 ```bash
-pip install -e /Users/morriz/Workspace/InstruktAI/python-logger
+pip install instruktai-python-logger
+```
+
+From GitHub:
+
+```bash
+pip install git+ssh://git@github.com/InstruktAI/python-logger.git
 ```
 
 ## API
