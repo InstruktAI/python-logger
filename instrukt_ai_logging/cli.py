@@ -9,25 +9,10 @@ from pathlib import Path
 from typing import Iterator
 
 from instrukt_ai_logging.logging import (
-    _fallback_log_root,
-    _resolve_log_root,
     iter_recent_log_lines,
     parse_since,
+    resolve_log_file,
 )
-
-
-def _resolve_log_file(app: str) -> Path:
-    primary_dir = _resolve_log_root(app)
-    primary_file = primary_dir / f"{app}.log"
-    if primary_file.exists():
-        return primary_file
-
-    fallback_dir = _fallback_log_root(app)
-    fallback_file = fallback_dir / f"{app}.log"
-    if fallback_file.exists():
-        return fallback_file
-
-    return primary_file
 
 
 def iter_follow_lines(
@@ -125,7 +110,7 @@ def main() -> None:
     except ValueError as e:
         raise SystemExit(str(e)) from e
 
-    log_file = _resolve_log_file(args.app)
+    log_file = resolve_log_file(args.app)
     if not log_file.exists():
         raise SystemExit(f"Log file not found: {log_file}")
 

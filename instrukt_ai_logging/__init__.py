@@ -7,6 +7,7 @@ __all__ = [
     "__version__",
     "configure_logging",
     "get_logger",
+    "resolve_log_file",
 ]
 
 try:
@@ -16,4 +17,8 @@ try:
 except Exception:  # pragma: no cover
     __version__ = "0.0.0"
 
-from instrukt_ai_logging.logging import configure_logging, get_logger  # noqa: E402  (intentional re-export)
+from instrukt_ai_logging.logging import (  # noqa: E402  (intentional re-export)
+    configure_logging,
+    get_logger,
+    resolve_log_file,
+)

@@ -296,22 +296,28 @@ class LoggingContract:
 
 
 def _resolve_log_root(app_name: str) -> Path:
+    fs_app_name = _normalize_app_name(app_name)
     override = os.getenv("INSTRUKT_AI_LOG_ROOT")
     if override:
-        return Path(override).expanduser()
-    return Path("/var/log/instrukt-ai") / app_name
-
-
-def _fallback_log_root(app_name: str) -> Path:
-    # Deterministic fallback: repo-local ./logs if available, else /tmp.
-    candidate = Path.cwd() / "logs"
-    if candidate.exists() or candidate.parent.exists():
-        return candidate
-    return Path("/tmp") / "instrukt-ai" / app_name
+        return Path(override).expanduser() / fs_app_name
+    return Path("/var/log/instrukt-ai") / fs_app_name
 
 
 def _ensure_log_dir(log_dir: Path) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
+
+
+def resolve_log_file(app_name: str, *, log_filename: str | None = None) -> Path:
+    """Resolve the canonical log file path for `app_name`.
+
+    `app_name` is normalized for filesystem layout, so callers may pass either:
+    - distribution/service name (e.g. "crypto-ai")
+    - Python module prefix (e.g. "crypto_ai")
+    """
+    fs_app_name = _normalize_app_name(app_name)
+    log_dir = _resolve_log_root(fs_app_name)
+    filename = log_filename or f"{fs_app_name}.log"
+    return log_dir / filename
 
 
 def configure_logging(
@@ -326,8 +332,8 @@ def configure_logging(
     """
     env_prefix = _normalize_env_prefix(name)
     app_logger_prefix = _normalize_logger_prefix(name)
-    app_name = app_logger_prefix
-    log_filename = log_filename or f"{app_logger_prefix}.log"
+    app_name = _normalize_app_name(name)
+    log_filename = log_filename or f"{app_name}.log"
 
     contract = LoggingContract(
         env_prefix=env_prefix,
@@ -352,11 +358,7 @@ def configure_logging(
     root_level = third_party_level if not spotlight else logging.WARNING
 
     log_dir = _resolve_log_root(app_name)
-    try:
-        _ensure_log_dir(log_dir)
-    except (PermissionError, OSError):
-        log_dir = _fallback_log_root(app_name)
-        _ensure_log_dir(log_dir)
+    _ensure_log_dir(log_dir)
 
     log_file = log_dir / log_filename
 
