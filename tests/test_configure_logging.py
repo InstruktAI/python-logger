@@ -35,9 +35,7 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
         monkeypatch.delenv("TELECLAUDE_THIRD_PARTY_LOGGERS", raising=False)
 
-        log_path = configure_logging(
-            name="teleclaude",
-        )
+        log_path = configure_logging("teleclaude")
 
         logging.getLogger("teleclaude.core").debug("hello from ours")
         logging.getLogger("httpcore.http11").info("hello from third-party")
@@ -55,9 +53,7 @@ def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatc
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOGGERS", "httpcore")
 
-        log_path = configure_logging(
-            name="teleclaude",
-        )
+        log_path = configure_logging("teleclaude")
 
         # Ensure records are actually created even though root is WARNING in spotlight mode.
         httpcore_logger = logging.getLogger("httpcore")
@@ -87,9 +83,7 @@ def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
 
-        log_path = configure_logging(
-            name="teleclaude",
-        )
+        log_path = configure_logging("teleclaude")
 
         logging.getLogger("teleclaude.core").info("hello", session="abc123", n=1)
 

@@ -33,7 +33,7 @@ Example:
 import logging
 from instrukt_ai_logging import configure_logging
 
-configure_logging(name="teleclaude")
+configure_logging("teleclaude")
 logger = logging.getLogger("teleclaude.core")
 logger.info("job_started", job_id="abc123", user_id=123)
 ```

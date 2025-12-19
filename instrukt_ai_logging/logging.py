@@ -315,8 +315,8 @@ def _ensure_log_dir(log_dir: Path) -> None:
 
 
 def configure_logging(
+    name: str,
     *,
-    name: str | None = None,
     app_logger_prefix: str | None = None,
     env_prefix: str | None = None,
     app_name: str | None = None,
@@ -327,18 +327,10 @@ def configure_logging(
 
     Returns the resolved log file path in use.
     """
-    if name is not None:
-        if env_prefix is not None or app_name is not None:
-            raise ValueError("Pass either name= OR env_prefix/app_name (not both)")
-        env_prefix = _normalize_env_prefix(name)
-        app_name = _normalize_app_name(name)
-        if app_logger_prefix is None:
-            app_logger_prefix = _normalize_logger_prefix(name)
-
-    if env_prefix is None or app_name is None or app_logger_prefix is None:
-        raise ValueError(
-            "Missing required config: name= (preferred) OR env_prefix/app_name/app_logger_prefix"
-        )
+    env_prefix = env_prefix or _normalize_env_prefix(name)
+    app_logger_prefix = app_logger_prefix or _normalize_logger_prefix(name)
+    app_name = app_name or app_logger_prefix
+    log_filename = log_filename or f"{app_logger_prefix}.log"
 
     contract = LoggingContract(
         env_prefix=env_prefix,
@@ -369,7 +361,7 @@ def configure_logging(
         log_dir = _fallback_log_root(app_name)
         _ensure_log_dir(log_dir)
 
-    log_file = log_dir / (log_filename or f"{app_name}.log")
+    log_file = log_dir / log_filename
 
     formatter = LogfmtFormatter(max_message_chars=max_message_chars)
 
