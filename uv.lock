@@ -21,7 +21,7 @@ wheels = [
 ]
 
 [[package]]
-name = "instruktai-python-logger"
+name = "instrukt-ai-logger"
 version = "0.2.1"
 source = { editable = "." }
 
