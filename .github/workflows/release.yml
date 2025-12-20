@@ -58,6 +58,8 @@ jobs:
           else
             git log HEAD --pretty=format:'- %s%n%b%n' > commits.txt
           fi
+          sed -e 's/^/      /' commits.txt > commits.indented
+          mv commits.indented commits.txt
           echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: AI decides bump + release notes
