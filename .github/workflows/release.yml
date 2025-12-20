@@ -65,7 +65,7 @@ jobs:
         uses: actions/ai-inference@v1
         with:
           prompt-file: ./.github/prompts/release-bump.prompt.yml
-          file_input:
+          file_input: |
             commits: ./commits.txt
 
       - name: Extract bump + notes
