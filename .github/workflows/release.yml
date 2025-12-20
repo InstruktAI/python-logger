@@ -64,35 +64,23 @@ jobs:
       - name: AI decides bump + release notes
         id: ai
         uses: actions/ai-inference@v1
-        continue-on-error: true
         with:
           prompt-file: ./.github/prompts/release-bump.prompt.yml
           file_input: |
             commits: ./commits.prompt.txt
+          token: ${{ secrets.GITHUB_MODELS_TOKEN || github.token }}
 
       - name: Extract bump + notes
         id: decision
         run: |
           set -euo pipefail
-          AI_RESPONSE='${{ steps.ai.outputs.response }}'
-          BUMP="minor"
-          NOTES=""
-          if [ -n "${AI_RESPONSE}" ]; then
-            echo "${AI_RESPONSE}" > ai.json
-            if jq -e . >/dev/null 2>&1 < ai.json; then
-              BUMP="$(jq -r '.bump // "minor"' ai.json)"
-              NOTES="$(jq -r '.notes_markdown // ""' ai.json)"
-            fi
-          fi
+          echo '${{ steps.ai.outputs.response }}' > ai.json
+          jq -e . >/dev/null 2>&1 < ai.json
+          BUMP="$(jq -r '.bump // "minor"' ai.json)"
           if [ "${BUMP}" != "minor" ] && [ "${BUMP}" != "patch" ]; then
             BUMP="minor"
           fi
-          if [ -z "${NOTES}" ]; then
-            printf "## Changes\n\n" > release-notes.md
-            cat commits.txt >> release-notes.md
-          else
-            echo "${NOTES}" > release-notes.md
-          fi
+          jq -r '.notes_markdown // ""' ai.json > release-notes.md
           echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
 
       - name: Bump version in pyproject.toml
