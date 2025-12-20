@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "instrukt-ai-logger"
+name = "instruktai-python-logger"
 version = "0.2.1"
 description = "Centralized logging utilities for Python services."
 readme = "README.md"

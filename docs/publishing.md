@@ -16,7 +16,7 @@ git push origin v0.1.0
 
 ## One-time PyPI setup
 
-In the PyPI project settings for `instrukt-ai-logger`:
+In the PyPI project settings for `instruktai-python-logger`:
 
 - Enable **Trusted Publishing**
 - Add a publisher for:

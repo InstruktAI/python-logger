@@ -12,7 +12,7 @@ Publishing notes live in `docs/publishing.md`.
 From PyPI (recommended):
 
 ```bash
-pip install instrukt-ai-logger
+pip install instruktai-python-logger
 ```
 
 From GitHub:
