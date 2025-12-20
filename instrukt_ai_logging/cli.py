@@ -36,58 +36,65 @@ def iter_follow_lines(
     inode = None
     start_at_end_for_next_open = start_at_end
 
-    while True:
-        if deadline is not None and time.monotonic() >= deadline:
-            return
+    try:
+        while True:
+            if deadline is not None and time.monotonic() >= deadline:
+                return
 
-        if f is None:
+            if f is None:
+                try:
+                    f = log_file.open("r", encoding="utf-8", errors="replace")
+                except FileNotFoundError:
+                    time.sleep(poll_interval_s)
+                    continue
+
+                try:
+                    inode = os.fstat(f.fileno()).st_ino
+                except OSError:
+                    inode = None
+
+                if start_at_end_for_next_open:
+                    f.seek(0, os.SEEK_END)
+                else:
+                    f.seek(0, os.SEEK_SET)
+
+                # Only the first open may start at end; after rotation we read from start.
+                start_at_end_for_next_open = False
+
+            line = f.readline()
+            if line:
+                yield line
+                emitted += 1
+                if max_lines is not None and emitted >= max_lines:
+                    return
+                continue
+
+            # No new data: detect rotation/truncation and wait.
             try:
-                f = log_file.open("r", encoding="utf-8", errors="replace")
+                st = log_file.stat()
             except FileNotFoundError:
+                f.close()
+                f = None
+                inode = None
                 time.sleep(poll_interval_s)
                 continue
 
-            try:
-                inode = os.fstat(f.fileno()).st_ino
-            except OSError:
+            if inode is not None and getattr(st, "st_ino", None) is not None and st.st_ino != inode:
+                f.close()
+                f = None
                 inode = None
+                continue
 
-            if start_at_end_for_next_open:
-                f.seek(0, os.SEEK_END)
-            else:
+            if f.tell() > st.st_size:
                 f.seek(0, os.SEEK_SET)
 
-            # Only the first open may start at end; after rotation we read from start.
-            start_at_end_for_next_open = False
-
-        line = f.readline()
-        if line:
-            yield line
-            emitted += 1
-            if max_lines is not None and emitted >= max_lines:
-                return
-            continue
-
-        # No new data: detect rotation/truncation and wait.
-        try:
-            st = log_file.stat()
-        except FileNotFoundError:
-            f.close()
-            f = None
-            inode = None
             time.sleep(poll_interval_s)
-            continue
-
-        if inode is not None and getattr(st, "st_ino", None) is not None and st.st_ino != inode:
-            f.close()
-            f = None
-            inode = None
-            continue
-
-        if f.tell() > st.st_size:
-            f.seek(0, os.SEEK_SET)
-
-        time.sleep(poll_interval_s)
+    finally:
+        if f is not None:
+            try:
+                f.close()
+            except OSError:
+                pass
 
 
 def main() -> None:
@@ -124,8 +131,11 @@ def main() -> None:
         return
 
     sys.stdout.flush()
-    for line in iter_follow_lines(log_file, start_at_end=True):
-        if pattern and not pattern.search(line):
-            continue
-        sys.stdout.write(line)
-        sys.stdout.flush()
+    try:
+        for line in iter_follow_lines(log_file, start_at_end=True):
+            if pattern and not pattern.search(line):
+                continue
+            sys.stdout.write(line)
+            sys.stdout.flush()
+    except KeyboardInterrupt:
+        return
