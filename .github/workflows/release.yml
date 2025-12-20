@@ -68,7 +68,7 @@ jobs:
           prompt-file: ./.github/prompts/release-bump.prompt.yml
           file_input: |
             commits: ./commits.prompt.txt
-          token: ${{ secrets.GITHUB_MODELS_TOKEN || github.token }}
+          token: ${{ secrets.INSTRUKTAI_MODELS_TOKEN || github.token }}
 
       - name: Extract bump + notes
         id: decision
