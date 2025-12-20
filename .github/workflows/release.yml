@@ -2,7 +2,7 @@ name: Release (Auto)
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   workflow_dispatch: {}
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -68,7 +68,7 @@ jobs:
           prompt-file: ./.github/prompts/release-bump.prompt.yml
           file_input: |
             commits: ./commits.prompt.txt
-          token: ${{ secrets.INSTRUKTAI_MODELS_TOKEN || github.token }}
+          token: ${{ secrets.INSTRUKTAI_MODELS_TOKEN }}
 
       - name: Extract bump + notes
         id: decision
