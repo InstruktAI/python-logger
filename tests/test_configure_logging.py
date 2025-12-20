@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from instrukt_ai_logging import configure_logging
+from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger
 
 
 @pytest.fixture()
@@ -44,6 +44,12 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
         assert "logger=teleclaude.core" in content
         assert 'msg="hello from ours"' in content
         assert "logger=httpcore.http11" not in content
+
+
+def test_get_logger_returns_instrukt_logger(isolated_logging):
+    logger = get_logger("teleclaude.core")
+    assert isinstance(logger, InstruktAILogger)
+    logger.info("hello", session="abc123", n=1)
 
 
 def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatch):

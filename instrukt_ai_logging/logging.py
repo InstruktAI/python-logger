@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast, runtime_checkable
 
 
 def _normalize_env_prefix(name: str) -> str:
@@ -178,7 +178,28 @@ class LogfmtFormatter(UtcMillisFormatter):
         return " ".join(parts)
 
 
-class InstruktLogger(logging.Logger):
+@runtime_checkable
+class InstruktAILoggerProtocol(Protocol):
+    """Type surface for loggers that accept arbitrary `**kv` fields."""
+
+    name: str
+
+    def debug(self, msg: object, *args: object, **kwargs: object) -> None: ...
+
+    def info(self, msg: object, *args: object, **kwargs: object) -> None: ...
+
+    def warning(self, msg: object, *args: object, **kwargs: object) -> None: ...
+
+    def error(self, msg: object, *args: object, **kwargs: object) -> None: ...
+
+    def critical(self, msg: object, *args: object, **kwargs: object) -> None: ...
+
+    def exception(self, msg: object, *args: object, **kwargs: object) -> None: ...
+
+    def log(self, level: int, msg: object, *args: object, **kwargs: object) -> None: ...
+
+
+class InstruktAILogger(logging.Logger):
     """Logger that accepts arbitrary `**kv` fields.
 
     This lets callers use normal logger methods with named key/value pairs:
@@ -248,9 +269,20 @@ class InstruktLogger(logging.Logger):
             self._log_with_kv(level, msg, args, **kwargs)
 
 
-def get_logger(name: str) -> logging.Logger:
-    """Compatibility helper (returns a normal logger, but with `**kv` support after configuration)."""
-    return logging.getLogger(name)
+def _coerce_instrukt_logger(logger: logging.Logger) -> InstruktAILogger:
+    if isinstance(logger, InstruktAILogger):
+        return logger
+    try:
+        logger.__class__ = InstruktAILogger
+    except TypeError:
+        pass
+    return cast(InstruktAILogger, logger)
+
+
+def get_logger(name: str) -> InstruktAILogger:
+    """Return a logger that accepts arbitrary `**kv` fields."""
+    logging.setLoggerClass(InstruktAILogger)
+    return _coerce_instrukt_logger(logging.getLogger(name))
 
 
 class _ThirdPartySelectorFilter(logging.Filter):
@@ -342,10 +374,10 @@ def configure_logging(
     )
 
     # Ensure all loggers accept arbitrary `**kv` (no wrapper at call sites).
-    logging.setLoggerClass(InstruktLogger)
+    logging.setLoggerClass(InstruktAILogger)
     for obj in logging.root.manager.loggerDict.values():
-        if isinstance(obj, logging.Logger) and not isinstance(obj, InstruktLogger):
-            obj.__class__ = InstruktLogger
+        if isinstance(obj, logging.Logger) and not isinstance(obj, InstruktAILogger):
+            obj.__class__ = InstruktAILogger
 
     our_level_name = (os.getenv(contract.env_log_level) or "INFO").upper()
     third_party_level_name = (os.getenv(contract.env_third_party_level) or "WARNING").upper()

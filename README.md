@@ -1,4 +1,4 @@
-# Instrukt AI's Python Logger`
+# InstruktAI Python Logger
 
 Centralized logging utilities for Python services.
 
@@ -12,7 +12,7 @@ Publishing notes live in `docs/publishing.md`.
 From PyPI (recommended):
 
 ```bash
-pip install instruktai-python-logger
+pip install instrukt-ai-logger
 ```
 
 From GitHub:

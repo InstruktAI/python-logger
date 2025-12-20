@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "instruktai-python-logger"
+name = "instrukt-ai-logger"
 version = "0.1.0"
 description = "Centralized logging utilities for Python services."
 readme = "README.md"
@@ -19,6 +19,9 @@ instrukt-ai-logs = "instrukt_ai_logging.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["instrukt_ai_logging*"]
+
+[tool.setuptools.package-data]
+instrukt_ai_logging = ["py.typed"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
