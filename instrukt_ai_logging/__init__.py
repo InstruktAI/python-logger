@@ -10,6 +10,7 @@ __all__ = [
     "InstruktAILogger",
     "InstruktAILoggerProtocol",
     "resolve_log_file",
+    "TRACE",
 ]
 
 try:
@@ -25,4 +26,5 @@ from instrukt_ai_logging.logging import (  # noqa: E402  (intentional re-export)
     InstruktAILogger,
     InstruktAILoggerProtocol,
     resolve_log_file,
+    TRACE,
 )
