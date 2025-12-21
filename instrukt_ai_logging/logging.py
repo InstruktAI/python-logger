@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast, runtime_checkable
 
 # Standard logging levels are: NOTSET=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
-TRACE = 5
+TRACE: int = 5
 logging.addLevelName(TRACE, "TRACE")
 # Monkey-patch logging so our _level_name_to_int helper finds it automatically.
 setattr(logging, "TRACE", TRACE)
@@ -245,7 +245,7 @@ class InstruktAILogger(logging.Logger):
             stacklevel=stacklevel,
         )
 
-    def trace(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def trace(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(TRACE):
             self._log_with_kv(TRACE, msg, args, **kwargs)
 
