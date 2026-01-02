@@ -44,4 +44,3 @@ def test_iter_follow_lines_yields_appended_lines_only():
 
         t.join(timeout=3)
         assert got == ["new1\n", "new2\n"]
-

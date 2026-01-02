@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging.handlers import WatchedFileHandler
@@ -216,7 +215,9 @@ class InstruktAILogger(logging.Logger):
     All `**kv` values are serialized to text by the formatter.
     """
 
-    def _log_with_kv(self, level: int, msg: object, args: tuple[object, ...], **kwargs: Any) -> None:
+    def _log_with_kv(
+        self, level: int, msg: object, args: tuple[object, ...], **kwargs: Any
+    ) -> None:
         exc_info = kwargs.pop("exc_info", None)
         stack_info = kwargs.pop("stack_info", False)
         stacklevel = kwargs.pop("stacklevel", 1)
@@ -429,19 +430,6 @@ def configure_logging(
         if prefix == app_logger_prefix or prefix.startswith(app_logger_prefix + "."):
             continue
         logging.getLogger(prefix).setLevel(third_party_level)
-
-    # Optional console output for interactive runs only.
-    if sys.stdout.isatty():  # type: ignore[misc]
-        console = logging.StreamHandler()
-        console.setLevel(logging.NOTSET)
-        console.setFormatter(formatter)
-        console.addFilter(
-            _ThirdPartySelectorFilter(
-                app_logger_prefix=app_logger_prefix,
-                spotlight_prefixes=tuple(spotlight),
-            )
-        )
-        logging.root.addHandler(console)
 
     return log_file
 

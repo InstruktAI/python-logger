@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import WatchedFileHandler
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -44,6 +45,18 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
         assert "logger=teleclaude.core" in content
         assert 'msg="hello from ours"' in content
         assert "logger=httpcore.http11" not in content
+
+
+def test_configure_logging_uses_single_file_handler(isolated_logging, monkeypatch):
+    with TemporaryDirectory() as tmp:
+        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
+        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
+
+        configure_logging("teleclaude")
+
+        assert len(logging.root.handlers) == 1
+        assert isinstance(logging.root.handlers[0], WatchedFileHandler)
 
 
 def test_get_logger_returns_instrukt_logger(isolated_logging):
