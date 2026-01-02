@@ -32,5 +32,6 @@ Before changing anything, read `docs/design.md`.
 ## Dev workflow expectations
 
 - Add unit tests for any behavior changes.
-- Run formatting + lint + tests before declaring work done (tooling to be defined in this repo’s `pyproject.toml`).
-
+- Run formatting: `uv run ruff format .`
+- Run linting: `uv run ruff check .`
+- Run tests: `uv run pytest`
