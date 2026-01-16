@@ -31,12 +31,14 @@ Per-app prefix contract:
 
 - `{APP}_LOG_LEVEL` (service logs)
 - `{APP}_THIRD_PARTY_LOG_LEVEL` (verbosity for third-party logs when enabled)
-- `{APP}_THIRD_PARTY_LOGGERS` (comma-separated logger prefixes to “spotlight”)
+- `{APP}_THIRD_PARTY_LOGGERS` (comma-separated logger prefixes to "spotlight")
+- `{APP}_MUTED_LOGGERS` (comma-separated logger prefixes to force to WARNING+)
 
 Selection semantics:
 
 - If `{APP}_THIRD_PARTY_LOGGERS` is set, only those prefixes are allowed to emit at `{APP}_THIRD_PARTY_LOG_LEVEL`; all other third-party logs are forced to WARNING+.
 - If `{APP}_THIRD_PARTY_LOGGERS` is unset/empty, `{APP}_THIRD_PARTY_LOG_LEVEL` applies to all third-party logs.
+- `{APP}_MUTED_LOGGERS` forces matched prefixes to WARNING+ regardless of whether they are app or third-party loggers. Use this to silence noisy app sub-namespaces.
 
 ### Infra logs are separate
 

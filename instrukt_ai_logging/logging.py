@@ -339,6 +339,10 @@ class LoggingContract:
     def env_third_party_loggers(self) -> str:
         return f"{self.env_prefix}_THIRD_PARTY_LOGGERS"
 
+    @property
+    def env_muted_loggers(self) -> str:
+        return f"{self.env_prefix}_MUTED_LOGGERS"
+
 
 def _resolve_log_root(app_name: str) -> Path:
     fs_app_name = _normalize_app_name(app_name)
@@ -395,6 +399,7 @@ def configure_logging(
     our_level_name = (os.getenv(contract.env_log_level) or "INFO").upper()
     third_party_level_name = (os.getenv(contract.env_third_party_level) or "WARNING").upper()
     spotlight = _parse_csv(os.getenv(contract.env_third_party_loggers, ""))
+    muted = _parse_csv(os.getenv(contract.env_muted_loggers, ""))
 
     our_level = _level_name_to_int(our_level_name, logging.INFO)
     third_party_level = _level_name_to_int(third_party_level_name, logging.WARNING)
@@ -430,6 +435,10 @@ def configure_logging(
         if prefix == app_logger_prefix or prefix.startswith(app_logger_prefix + "."):
             continue
         logging.getLogger(prefix).setLevel(third_party_level)
+
+    # Muted loggers are forced to WARNING+ (applies to both app and third-party).
+    for prefix in muted:
+        logging.getLogger(prefix).setLevel(logging.WARNING)
 
     return log_file
 

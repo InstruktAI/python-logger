@@ -10,6 +10,7 @@ Before changing anything, read `docs/design.md`.
   - `{APP}_LOG_LEVEL`
   - `{APP}_THIRD_PARTY_LOG_LEVEL`
   - `{APP}_THIRD_PARTY_LOGGERS`
+  - `{APP}_MUTED_LOGGERS`
   - `INSTRUKT_AI_LOG_ROOT`
 - Prefer adding capabilities behind existing knobs over introducing new knobs.
 

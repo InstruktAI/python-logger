@@ -44,7 +44,8 @@ Per-app prefix model (example uses `TELECLAUDE_`):
 
 - `TELECLAUDE_LOG_LEVEL`
 - `TELECLAUDE_THIRD_PARTY_LOG_LEVEL`
-- `TELECLAUDE_THIRD_PARTY_LOGGERS` (comma-separated logger prefixes, e.g. `httpcore,telegram`)
+- `TELECLAUDE_THIRD_PARTY_LOGGERS` (comma-separated logger prefixes to spotlight, e.g. `httpcore,telegram`)
+- `TELECLAUDE_MUTED_LOGGERS` (comma-separated logger prefixes to force to WARNING+, e.g. `teleclaude.cli.tui`)
 
 Global:
 

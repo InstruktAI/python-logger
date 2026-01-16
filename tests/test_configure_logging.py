@@ -110,3 +110,27 @@ def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
         assert 'msg="hello"' in content
         assert "session=abc123" in content
         assert "n=1" in content
+
+
+def test_muted_loggers_forced_to_warning(isolated_logging, monkeypatch):
+    with TemporaryDirectory() as tmp:
+        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "DEBUG")
+        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
+        monkeypatch.setenv("TELECLAUDE_MUTED_LOGGERS", "teleclaude.cli.tui")
+
+        log_path = configure_logging("teleclaude")
+
+        logging.getLogger("teleclaude.core").debug("core debug")
+        logging.getLogger("teleclaude.cli.tui").debug("tui debug")
+        logging.getLogger("teleclaude.cli.tui").warning("tui warning")
+
+        content = _read_text(log_path)
+        # Core debug should appear (app level is DEBUG)
+        assert "logger=teleclaude.core" in content
+        assert 'msg="core debug"' in content
+        # Muted logger's debug should NOT appear (forced to WARNING)
+        assert "tui debug" not in content
+        # Muted logger's warning SHOULD appear
+        assert "logger=teleclaude.cli.tui" in content
+        assert 'msg="tui warning"' in content

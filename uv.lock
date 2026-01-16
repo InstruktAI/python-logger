@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 
 [[package]]
@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "instrukt-ai-logger"
-version = "0.3.3"
+version = "0.3.5"
 source = { editable = "." }
 
 [package.optional-dependencies]
