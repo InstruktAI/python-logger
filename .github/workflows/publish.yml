@@ -12,7 +12,6 @@ permissions:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    if: ${{ vars.PYPI_PUBLISH_ENABLED == 'true' }}
     permissions:
       contents: read
     steps:
