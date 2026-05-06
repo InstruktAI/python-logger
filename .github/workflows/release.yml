@@ -72,9 +72,13 @@ jobs:
 
       - name: Extract bump + notes
         id: decision
+        env:
+          AI_RESPONSE: ${{ steps.ai.outputs.response }}
         run: |
           set -euo pipefail
-          echo '${{ steps.ai.outputs.response }}' > ai.json
+          # Use env var instead of templating into the shell — safe against
+          # responses with embedded newlines, quotes, or backticks.
+          printf '%s' "$AI_RESPONSE" > ai.json
           jq -e . >/dev/null 2>&1 < ai.json
           BUMP="$(jq -r '.bump // "minor"' ai.json)"
           if [ "${BUMP}" != "minor" ] && [ "${BUMP}" != "patch" ]; then
