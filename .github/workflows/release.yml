@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   models: read
+  actions: write
 
 concurrency:
   group: release-main
