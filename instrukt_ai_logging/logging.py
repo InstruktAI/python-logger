@@ -564,6 +564,12 @@ def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Ite
     entries stay adjacent to their parent). The resulting per-file streams are
     merged via a k-way heap merge, producing a single chronologically-ordered
     output stream.
+
+    Files whose mtime falls before the cutoff are skipped entirely — no line
+    inside them can be newer than the file itself, so reading them only burns
+    I/O. This matters for log directories with large rotation history or
+    sibling streams (git-wrapper.log, etc.) the caller didn't explicitly
+    request via `--logs`.
     """
     cutoff = _now_utc() - since
 
@@ -588,6 +594,16 @@ def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Ite
         finally:
             f.close()
 
-    streams = [_file_stream(p) for p in files]
+    eligible: list[Path] = []
+    for path in files:
+        try:
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            continue
+        if mtime < cutoff:
+            continue
+        eligible.append(path)
+
+    streams = [_file_stream(p) for p in eligible]
     for _, line in heapq.merge(*streams, key=lambda item: item[0]):
         yield line

@@ -111,6 +111,32 @@ def test_iter_recent_log_lines_merged_respects_since_cutoff(app_log_dir: Path) -
     assert "fresh" in lines[0]
 
 
+def test_iter_recent_log_lines_merged_skips_files_with_mtime_before_cutoff(
+    app_log_dir: Path,
+) -> None:
+    import os
+    from datetime import datetime, timezone
+
+    fresh = app_log_dir / "demo-app.log"
+    fresh.write_text(
+        f"{_now_iso(-1)} level=INFO logger=demo.daemon msg=fresh\n",
+        encoding="utf-8",
+    )
+    stale = app_log_dir / "stale.log"
+    stale.write_text(
+        f"{_now_iso(-1)} level=INFO logger=stale msg=stale-but-line-looks-recent\n",
+        encoding="utf-8",
+    )
+    # Force stale.log's mtime to 1 day ago — older than --since=10m cutoff.
+    one_day_ago = (datetime.now(tz=timezone.utc) - timedelta(days=1)).timestamp()
+    os.utime(stale, (one_day_ago, one_day_ago))
+
+    files = resolve_log_files("demo-app")
+    lines = list(iter_recent_log_lines_merged(files, since=timedelta(minutes=10)))
+    msgs = [line.strip().rsplit("=", 1)[-1] for line in lines]
+    assert msgs == ["fresh"]
+
+
 def test_iter_recent_log_lines_merged_keeps_continuation_lines_with_parent(
     app_log_dir: Path,
 ) -> None:
