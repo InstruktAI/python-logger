@@ -4,14 +4,15 @@ import argparse
 import os
 import re
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Iterator
 
 from instrukt_ai_logging.logging import (
-    iter_recent_log_lines,
+    iter_recent_log_lines_merged,
     parse_since,
-    resolve_log_file,
+    resolve_log_files,
 )
 
 
@@ -97,9 +98,27 @@ def iter_follow_lines(
                 pass
 
 
+def _parse_stems(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _stem_of(path: Path) -> str:
+    """Return the stem before the first `.log` suffix (e.g. `cron.log.1` → `cron`)."""
+    name = path.name
+    idx = name.find(".log")
+    return name[:idx] if idx > 0 else name
+
+
+def _is_rotation_suffix(path: Path) -> bool:
+    """True for `<stem>.log.<n>` rotation files (and friends), false for `<stem>.log`."""
+    name = path.name
+    idx = name.find(".log")
+    return idx > 0 and name[idx + len(".log") :] != ""
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="instrukt-ai-logs", add_help=True)
-    parser.add_argument("app", help="App/service name (folder and filename stem)")
+    parser.add_argument("app", help="App/service name (folder under /var/log/instrukt-ai/)")
     parser.add_argument(
         "--since", default="10m", help="Time window (e.g. 10m, 2h, 1d). Default: 10m"
     )
@@ -110,6 +129,14 @@ def main() -> None:
         help="Follow the log (tail -f style) after printing the --since window",
     )
     parser.add_argument("--grep", default="", help="Regex to filter lines (optional)")
+    parser.add_argument(
+        "--logs",
+        default="",
+        help=(
+            "Comma-separated list of stems to include (e.g. 'cron,docs-watch'). "
+            "Default: all log files in the app's directory."
+        ),
+    )
     args = parser.parse_args()
 
     try:
@@ -117,12 +144,21 @@ def main() -> None:
     except ValueError as e:
         raise SystemExit(str(e)) from e
 
-    log_file = resolve_log_file(args.app)
-    if not log_file.exists():
-        raise SystemExit(f"Log file not found: {log_file}")
-
     pattern = re.compile(args.grep) if args.grep else None
-    for line in iter_recent_log_lines(log_file, since):
+    stems = _parse_stems(args.logs) or None
+
+    files = resolve_log_files(args.app, stems=stems)
+    if not files:
+        if stems:
+            available = sorted({_stem_of(p) for p in resolve_log_files(args.app)})
+            available_str = ", ".join(available) if available else "(none)"
+            raise SystemExit(
+                f"No log files matched stems {stems} in app '{args.app}'. "
+                f"Available: {available_str}"
+            )
+        raise SystemExit(f"No log files found for app '{args.app}'")
+
+    for line in iter_recent_log_lines_merged(files, since):
         if pattern and not pattern.search(line):
             continue
         sys.stdout.write(line)
@@ -131,11 +167,51 @@ def main() -> None:
         return
 
     sys.stdout.flush()
+
+    # Follow each selected file concurrently. New lines from any file are
+    # written to stdout as they arrive — no cross-file timestamp merge in
+    # follow mode, since real-time arrival ordering is its own merge.
+    # Filter to files that actually exist for the canonical (default) glob —
+    # for the explicit `--logs=` case, follow each named stem's canonical
+    # file (the unsuffixed `<stem>.log`) so we don't follow rotated history.
+    if stems is None:
+        follow_files = [p for p in files if not _is_rotation_suffix(p)]
+    else:
+        follow_files = []
+        for stem in stems:
+            for p in files:
+                if p.name == f"{stem}.log":
+                    follow_files.append(p)
+                    break
+
+    if not follow_files:
+        return
+
+    stop_event = threading.Event()
+
+    def _follow_one(path: Path) -> None:
+        try:
+            for line in iter_follow_lines(path, start_at_end=True):
+                if stop_event.is_set():
+                    return
+                if pattern and not pattern.search(line):
+                    continue
+                sys.stdout.write(line)
+                sys.stdout.flush()
+        except OSError:
+            return
+
+    threads = [
+        threading.Thread(target=_follow_one, args=(path,), daemon=True, name=f"follow-{path.name}")
+        for path in follow_files
+    ]
+    for t in threads:
+        t.start()
+
     try:
-        for line in iter_follow_lines(log_file, start_at_end=True):
-            if pattern and not pattern.search(line):
-                continue
-            sys.stdout.write(line)
-            sys.stdout.flush()
+        while any(t.is_alive() for t in threads):
+            for t in threads:
+                t.join(timeout=0.25)
     except KeyboardInterrupt:
+        stop_event.set()
         return

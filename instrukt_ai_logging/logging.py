@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 import logging
 import os
 import re
@@ -7,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, Iterable, Iterator, Protocol, cast, runtime_checkable
 
 # Standard logging levels are: NOTSET=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
 TRACE: int = 5
@@ -356,33 +357,80 @@ def _ensure_log_dir(log_dir: Path) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
 
 
-def resolve_log_file(app_name: str, *, log_filename: str | None = None) -> Path:
+def resolve_log_file(app_name: str, *, source: str | None = None) -> Path:
     """Resolve the canonical log file path for `app_name`.
 
     `app_name` is normalized for filesystem layout, so callers may pass either:
     - distribution/service name (e.g. "crypto-ai")
     - Python module prefix (e.g. "crypto_ai")
+
+    `source` is the logical identity of the producing process within the app.
+    When omitted, the file is `<app_name>.log` (the canonical/default file).
+    When provided (e.g. "cron", "docs-watch"), the file is `<source>.log`.
+    The `.log` extension is always appended; callers pass the bare stem.
     """
     fs_app_name = _normalize_app_name(app_name)
     log_dir = _resolve_log_root(fs_app_name)
-    filename = log_filename or f"{fs_app_name}.log"
-    return log_dir / filename
+    stem = source or fs_app_name
+    return log_dir / f"{stem}.log"
+
+
+def resolve_log_files(app_name: str, *, stems: Iterable[str] | None = None) -> list[Path]:
+    """Resolve all log files for `app_name`, optionally filtered by stem.
+
+    Returns every `<something>.log[.suffix]` file in the app's log directory,
+    excluding compressed rotation siblings (`.gz`). When `stems` is provided,
+    only files whose stem (basename before the first `.log`) matches an entry
+    are returned. Files are deduplicated and sorted by path.
+
+    `stems` selects by exact stem, not substring — so `stems=["cron"]` matches
+    `cron.log`, `cron.log.0`, `cron.log.1` and never `cron-backup.log`.
+    """
+    fs_app_name = _normalize_app_name(app_name)
+    log_dir = _resolve_log_root(fs_app_name)
+    if not log_dir.exists():
+        return []
+
+    if stems is None:
+        candidates: list[Path] = list(log_dir.glob("*.log*"))
+    else:
+        candidates = []
+        for stem in stems:
+            candidates.extend(log_dir.glob(f"{stem}.log*"))
+
+    seen: set[Path] = set()
+    result: list[Path] = []
+    for path in candidates:
+        if path in seen:
+            continue
+        if not path.is_file():
+            continue
+        if path.name.endswith(".gz"):
+            continue
+        seen.add(path)
+        result.append(path)
+    return sorted(result)
 
 
 def configure_logging(
     name: str,
     *,
-    log_filename: str | None = None,
+    source: str | None = None,
     max_message_chars: int = 4000,
 ) -> Path:
     """Configure logging according to the InstruktAI contract.
+
+    `source` is the logical identity of the producing process within the app.
+    When omitted, the file is `<app>.log` (canonical/default). When provided
+    (e.g. `source="cron"`), the file is `<source>.log`. The `.log` extension
+    is always appended by the library; callers pass the bare stem.
 
     Returns the resolved log file path in use.
     """
     env_prefix = _normalize_env_prefix(name)
     app_logger_prefix = _normalize_logger_prefix(name)
     app_name = _normalize_app_name(name)
-    log_filename = log_filename or f"{app_name}.log"
+    log_filename = f"{source or app_name}.log"
 
     contract = LoggingContract(
         env_prefix=env_prefix,
@@ -506,3 +554,40 @@ def iter_recent_log_lines(log_file: Path, since: timedelta) -> list[str]:
             continue
 
     return lines
+
+
+def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Iterator[str]:
+    """Yield lines newer than now-`since` merged across multiple files by timestamp.
+
+    Each file is read independently; lines without a parsable leading timestamp
+    inherit the previous parsed timestamp from their own file (so multi-line
+    entries stay adjacent to their parent). The resulting per-file streams are
+    merged via a k-way heap merge, producing a single chronologically-ordered
+    output stream.
+    """
+    cutoff = _now_utc() - since
+
+    def _file_stream(path: Path) -> Iterator[tuple[datetime, str]]:
+        try:
+            f = path.open("r", encoding="utf-8", errors="replace")
+        except FileNotFoundError:
+            return
+        try:
+            last_ts: datetime | None = None
+            for line in f:
+                ts = parse_log_timestamp(line)
+                if ts is None:
+                    if last_ts is None or last_ts < cutoff:
+                        continue
+                    yield (last_ts, line)
+                    continue
+                last_ts = ts
+                if ts < cutoff:
+                    continue
+                yield (ts, line)
+        finally:
+            f.close()
+
+    streams = [_file_stream(p) for p in files]
+    for _, line in heapq.merge(*streams, key=lambda item: item[0]):
+        yield line

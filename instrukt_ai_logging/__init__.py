@@ -10,6 +10,7 @@ __all__ = [
     "InstruktAILogger",
     "InstruktAILoggerProtocol",
     "resolve_log_file",
+    "resolve_log_files",
     "TRACE",
 ]
 
@@ -26,5 +27,6 @@ from instrukt_ai_logging.logging import (  # noqa: E402  (intentional re-export)
     InstruktAILogger,
     InstruktAILoggerProtocol,
     resolve_log_file,
+    resolve_log_files,
     TRACE,
 )
