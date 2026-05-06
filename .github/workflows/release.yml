@@ -63,7 +63,7 @@ jobs:
 
       - name: AI decides bump + release notes
         id: ai
-        uses: actions/ai-inference@v1
+        uses: actions/ai-inference@v2
         with:
           prompt-file: ./.github/prompts/release-bump.prompt.yml
           file_input: |
@@ -105,3 +105,12 @@ jobs:
         with:
           tag_name: v${{ steps.bump.outputs.version }}
           body_path: release-notes.md
+
+      - name: Trigger publish workflow for the new tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The default GITHUB_TOKEN can't trigger sibling workflows from a
+          # push event (loop guard), so we dispatch publish.yml explicitly.
+          gh workflow run publish.yml --ref "v${{ steps.bump.outputs.version }}"
