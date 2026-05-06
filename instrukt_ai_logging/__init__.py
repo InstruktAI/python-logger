@@ -15,9 +15,10 @@ __all__ = [
 ]
 
 try:
-    from importlib.metadata import version as _pkg_version
+    from importlib.metadata import packages_distributions, version as _pkg_version
 
-    __version__ = _pkg_version("instrukt-ai-logger")
+    _dists = packages_distributions().get(__name__, [])
+    __version__ = _pkg_version(_dists[0]) if _dists else "0.0.0"
 except Exception:  # pragma: no cover
     __version__ = "0.0.0"
 

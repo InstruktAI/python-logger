@@ -117,7 +117,14 @@ def _is_rotation_suffix(path: Path) -> bool:
 
 
 def main() -> None:
+    from instrukt_ai_logging import __version__
+
     parser = argparse.ArgumentParser(prog="instrukt-ai-logs", add_help=True)
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     parser.add_argument("app", help="App/service name (folder under /var/log/instrukt-ai/)")
     parser.add_argument(
         "--since", default="10m", help="Time window (e.g. 10m, 2h, 1d). Default: 10m"
