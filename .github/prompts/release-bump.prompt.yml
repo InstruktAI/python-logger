@@ -20,7 +20,7 @@ messages:
 
       {{commits}}
 
-model: openai/gpt-4o
+model: openai/gpt-5
 responseFormat: json_schema
 jsonSchema: |-
   {
@@ -37,4 +37,3 @@ jsonSchema: |-
       "required": ["bump", "breaking", "notes_markdown"]
     }
   }
-
