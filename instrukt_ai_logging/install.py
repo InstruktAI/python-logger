@@ -16,17 +16,28 @@ def _write_file(path: Path, content: str, *, force: bool) -> None:
 
 
 def _install_newsyslog(log_root: Path, *, force: bool) -> Path:
+    """Install a glob-based newsyslog rule covering every app's *.log file.
+
+    Format: path  owner:group  mode  count  size(KB)  when  flags
+    Defaults: 50 MB rotation, 5 archives, gzip-compress archives (Z flag).
+    """
     conf_path = Path("/etc/newsyslog.d/instrukt-ai.conf")
-    line = f"{log_root}/" + "*/*.log  640  10  100000  *  N\n"
+    line = f"{log_root}/" + "*/*.log  640  5  50000  *  Z\n"
     _write_file(conf_path, line, force=force)
     return conf_path
 
 
 def _install_logrotate(log_root: Path, *, force: bool) -> Path:
+    """Install a glob-based logrotate rule covering every app's *.log file.
+
+    Defaults: 50 MB rotation, 5 archives, gzip-compress archives.
+    """
     conf_path = Path("/etc/logrotate.d/instrukt-ai")
     content = f"""{log_root}/*/*.log {{
-    size 100M
-    rotate 10
+    size 50M
+    rotate 5
+    compress
+    delaycompress
     missingok
     notifempty
     copytruncate
