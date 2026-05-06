@@ -38,6 +38,22 @@ logger = logging.getLogger("teleclaude.core")
 logger.info("job_started", job_id="abc123", user_id=123)
 ```
 
+### Per-process log files (multi-producer apps)
+
+When several processes belong to the same app (a daemon plus a watcher plus a
+cron, for example), each one can own its own file under the same app directory
+by passing `source=`:
+
+```py
+configure_logging("teleclaude")                       # → teleclaude.log (default)
+configure_logging("teleclaude", source="docs-watch")  # → docs-watch.log
+configure_logging("teleclaude", source="cron")        # → cron.log
+```
+
+The `.log` extension is always appended; pass the bare stem. Files all live
+under `/var/log/instrukt-ai/{app}/`. The CLI merges them transparently
+(see below).
+
 ## Environment variables (contract)
 
 Per-app prefix model (example uses `TELECLAUDE_`):
@@ -73,4 +89,13 @@ instrukt-ai-logs teleclaude --since 10m --grep 'logger=teleclaude'
 
 # Follow (tail -f style) after printing the --since window
 instrukt-ai-logs teleclaude --since 10m --follow
+
+# Restrict to specific source streams (per-process files)
+instrukt-ai-logs teleclaude --since 1h --logs=cron,docs-watch
 ```
+
+Without `--logs`, every `*.log*` file in the app directory is merged by
+timestamp (rotation suffixes included). With `--logs=stem1,stem2`, only files
+whose stem matches an entry are read — exact stem match, so `--logs=cron`
+picks `cron.log`, `cron.log.0`, `cron.log.1` and never `cron-backup.log`.
+Follow mode reads each selected file with one polling thread per file.
