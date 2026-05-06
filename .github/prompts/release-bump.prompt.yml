@@ -20,7 +20,7 @@ messages:
 
       {{commits}}
 
-model: openai/gpt-5
+model: openai/gpt-4o
 responseFormat: json_schema
 jsonSchema: |-
   {
