@@ -8,3 +8,16 @@ __pycache__/
 dist/
 build/
 
+# Local AI config artifacts
+.agents/
+.antigravitycli/
+.claude/
+.codex/
+.gemini/
+
+# TeleClaude worktree infrastructure state (changes with every prep cycle)
+.teleclaude/
+
+# Blueprint engine working directory (graphify cache/output; the published
+# Blueprint lives under .teleclaude/blueprint/). Never tracked.
+graphify-out/
