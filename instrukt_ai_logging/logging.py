@@ -249,32 +249,32 @@ class InstruktAILogger(logging.Logger):
         if self.isEnabledFor(TRACE):
             self._log_with_kv(TRACE, msg, args, **kwargs)
 
-    def debug(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def debug(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(logging.DEBUG):
             self._log_with_kv(logging.DEBUG, msg, args, **kwargs)
 
-    def info(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def info(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(logging.INFO):
             self._log_with_kv(logging.INFO, msg, args, **kwargs)
 
-    def warning(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def warning(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(logging.WARNING):
             self._log_with_kv(logging.WARNING, msg, args, **kwargs)
 
-    def error(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def error(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(logging.ERROR):
             self._log_with_kv(logging.ERROR, msg, args, **kwargs)
 
-    def critical(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def critical(self, msg: object, *args: object, **kwargs: Any) -> None:
         if self.isEnabledFor(logging.CRITICAL):
             self._log_with_kv(logging.CRITICAL, msg, args, **kwargs)
 
-    def exception(self, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def exception(self, msg: object, *args: object, **kwargs: Any) -> None:
         kwargs.setdefault("exc_info", True)
         if self.isEnabledFor(logging.ERROR):
             self._log_with_kv(logging.ERROR, msg, args, **kwargs)
 
-    def log(self, level: int, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
+    def log(self, level: int, msg: object, *args: object, **kwargs: Any) -> None:
         if not isinstance(level, int):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("level must be an int")
         if self.isEnabledFor(level):
