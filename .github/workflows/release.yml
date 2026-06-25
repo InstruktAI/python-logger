@@ -2,7 +2,7 @@ name: Release (Auto)
 
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
   workflow_dispatch: {}
 
 permissions:
@@ -34,13 +34,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
 
       - name: Install dev deps
-        run: uv sync --extra dev
+        run: uv sync --group dev
 
       - name: Lint + tests
         run: |

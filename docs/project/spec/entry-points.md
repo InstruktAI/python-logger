@@ -21,8 +21,9 @@ internal and may change without a version bump.
 Console scripts (from `[project.scripts]`):
 
 - `instrukt-ai-logs = "instrukt_ai_logging.cli:main"` — read recent log lines
-  with optional regex filter, time window (`--since`), per-source stem
-  selection (`--logs`), and `tail -f`-style follow (`-f` / `--follow`).
+  with keep/drop regex filters (`--grep` keeps, `--exclude` drops, applied after
+  `--grep`), time window (`--since`), per-source stem selection
+  (`--logs`, alias `--include`), and `tail -f`-style follow (`-f` / `--follow`).
 - `instrukt-ai-log-setup = "instrukt_ai_logging.install:main"` — write
   platform-appropriate rotation config: newsyslog on macOS
   (`/etc/newsyslog.d/instrukt-ai.conf`), logrotate on Linux
@@ -48,7 +49,7 @@ Python package API (`instrukt_ai_logging/__init__.py::__all__`):
 
 CLI argument surfaces:
 
-- `instrukt-ai-logs <app> [--since 10m] [--follow] [--grep PATTERN] [--logs stem1,stem2] [--version]`
+- `instrukt-ai-logs <app> [--since 10m] [--follow] [--grep PATTERN] [--exclude PATTERN] [--logs/--include stem1,stem2] [--version]`
 - `instrukt-ai-log-setup [--log-root PATH] [--force]`
 
 ## Allowed values
@@ -57,8 +58,8 @@ CLI argument surfaces:
   passes (env prefix, logger prefix, fs app name). Any string with at least one
   alphanumeric character will produce a valid contract; punctuation is collapsed.
 - `--since` accepts an integer suffixed with `s|m|h|d` (parsed by `parse_since`).
-- `--logs` is a comma-separated list of stems; matching is exact-stem
-  (`cron` matches `cron.log`, `cron.log.0`, never `cron-backup.log`).
+- `--logs` (alias `--include`) is a comma-separated list of stems; matching is
+  exact-stem (`cron` matches `cron.log`, `cron.log.0`, never `cron-backup.log`).
 
 ## Known caveats
 

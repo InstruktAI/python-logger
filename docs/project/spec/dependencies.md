@@ -2,7 +2,7 @@
 id: "project/spec/dependencies"
 type: "spec"
 scope: "project"
-description: "Runtime and development dependencies of instruktai-python-logger. Runtime is stdlib-only by design; dev extras are pytest and ruff."
+description: "Runtime and development dependencies of instruktai-python-logger. Runtime is stdlib-only by design; the dev dependency-group is pytest, ruff, pyright, and mypy."
 generated_by: "telec-init"
 generated_at: "2026-05-06T23:30:00Z"
 ---
@@ -30,16 +30,20 @@ Runtime dependencies (`[project] dependencies`):
   `dataclasses`, `datetime`, `re`, `os`, `sys`, `argparse`, `heapq`,
   `threading`, `time`, `typing`).
 
-Development extras (`[project.optional-dependencies] dev`):
+Development dependencies (`[dependency-groups] dev`):
 
 - `pytest>=8`
 - `ruff>=0.8`
+- `pyright>=1.1`
+- `mypy>=1.10`
 
 Toolchain expectations:
 
 - Lockfile managed by `uv` (`uv.lock` checked in; `chore(deps): refresh uv.lock`
   appears in recent commit history).
-- Sync dev deps with `uv sync --extra dev` (used by `.github/workflows/release.yml`).
+- Sync dev deps with `uv sync --group dev` (the `dev` group installs by default;
+  the Makefile `install` target uses `uv run --group dev` and
+  `.github/workflows/release.yml` runs `uv sync --group dev`).
 
 CI-only tools (not declared in `pyproject.toml`):
 

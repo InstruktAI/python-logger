@@ -2,7 +2,7 @@
 id: "project/policy/conventions"
 type: "policy"
 scope: "project"
-description: "Code conventions observed in instrukt_ai_logging: snake_case Python with type hints, ruff formatting at line-length 100, future annotations, stdlib-only runtime."
+description: "Code conventions observed in instrukt_ai_logging: snake_case Python with type hints, ruff formatting at line-length 120, future annotations, stdlib-only runtime."
 generated_by: "telec-init"
 generated_at: "2026-05-06T23:30:00Z"
 ---
@@ -32,7 +32,7 @@ generated_at: "2026-05-06T23:30:00Z"
   `py.typed` is shipped under `instrukt_ai_logging/` and declared in
   `[tool.setuptools.package-data]`.
 - **Formatting and lint:**
-  - Ruff with `line-length = 100`, `target-version = "py311"`.
+  - Ruff with `line-length = 120`, `target-version = "py311"`.
   - Lint: `uv run ruff check .` (or `telec code lint`).
   - Format: `uv run ruff format .` (or `telec code format`).
 - **Tests:**
