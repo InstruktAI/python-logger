@@ -9,7 +9,6 @@ dist/
 build/
 
 # Local AI config artifacts
-.agents/
 .antigravitycli/
 .claude/
 .codex/
@@ -17,6 +16,18 @@ build/
 
 # TeleClaude worktree infrastructure state (changes with every prep cycle)
 .teleclaude/
+**/index.yaml
+# Inflated per-domain baselines generated beside their source manifest and
+# exposed via the whole-tree docs symlink at ~/.teleclaude/docs/<domain>/.
+docs/global/*/domain-baseline.md
+
+# Generated agent instructions — source of truth is AGENTS.master.md; the
+# inflated AGENTS.md/CLAUDE.md build artifacts are never tracked.
+AGENTS.md
+CLAUDE.md
+
+# Integration/worker git worktrees (operational, never tracked)
+/trees/
 
 # Blueprint engine working directory (graphify cache/output; the published
 # Blueprint lives under .teleclaude/blueprint/). Never tracked.

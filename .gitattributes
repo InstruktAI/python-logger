@@ -1,0 +1,2 @@
+docs/**/*.md filter=teleclaude-docs
+agents/docs/**/*.md filter=teleclaude-docs

@@ -1,0 +1,12 @@
+last_analyzed_at: "2026-05-06T23:30:00Z"
+analyzed_by: telec-init
+files_analyzed: 16
+snippets_generated:
+  - project/design/architecture
+  - project/design/test-strategy
+  - project/policy/conventions
+  - project/spec/dependencies
+  - project/spec/entry-points
+  - project/spec/build-deploy
+  - project/spec/configuration
+snippets_preserved: []
