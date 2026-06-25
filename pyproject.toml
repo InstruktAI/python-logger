@@ -70,12 +70,18 @@ files = ["instrukt_ai_logging"]
 # version may not need rather than flagging them and breaking on version drift.
 warn_unused_ignores = false
 
+# Tests are exercised by pytest, not strict typing. `tests/__init__.py` makes mypy
+# name test modules `tests.*` under both full and scoped (per-file commit-gate)
+# runs, so this relaxation matches in both. `call-arg` is disabled because tests
+# call the kv-logger through stdlib `logging.getLogger`, whose base type omits **kv.
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false
+check_untyped_defs = false
 ignore_missing_imports = true
+disable_error_code = ["call-arg"]
 
 [tool.guardrails]
 max_ignore_files = 8

@@ -7,6 +7,23 @@ from instrukt_ai_logging.logging import (
     get_logger,
 )
 
+# Log markers shared by each test and its assertions — named constants per
+# software-development/procedure/snapshot-testing (no bare literals in content
+# assertions). The logfmt field fragments are derived from the markers so the
+# expected output stays in sync with what is logged.
+_TRACE_MSG = "This is a trace message"
+_DEBUG_MSG = "This is a debug message"
+_KV_KEY = "kv_key"
+_KV_VALUE = "kv_value"
+_FILTERED_TRACE_MSG = "This should not appear"
+_FILTERED_DEBUG_MSG = "This should appear"
+
+_LEVEL_TRACE_FIELD = "level=TRACE"
+_LEVEL_DEBUG_FIELD = "level=DEBUG"
+_TRACE_MSG_FIELD = f'msg="{_TRACE_MSG}"'
+_DEBUG_MSG_FIELD = f'msg="{_DEBUG_MSG}"'
+_KV_FIELD = f"{_KV_KEY}={_KV_VALUE}"
+
 
 @pytest.fixture
 def clean_env():
@@ -29,23 +46,23 @@ def test_trace_level_logging(clean_env):
         logger = get_logger("test_trace_app")
 
         # Log at TRACE level
-        logger.trace("This is a trace message", kv_key="kv_value")
+        logger.trace(_TRACE_MSG, **{_KV_KEY: _KV_VALUE})
 
         # Log at DEBUG level
-        logger.debug("This is a debug message")
+        logger.debug(_DEBUG_MSG)
 
         # Read the log file
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             lines = f.readlines()
 
         assert len(lines) == 2
 
-        assert "level=TRACE" in lines[0]
-        assert 'msg="This is a trace message"' in lines[0]
-        assert "kv_key=kv_value" in lines[0]
+        assert _LEVEL_TRACE_FIELD in lines[0]
+        assert _TRACE_MSG_FIELD in lines[0]
+        assert _KV_FIELD in lines[0]
 
-        assert "level=DEBUG" in lines[1]
-        assert 'msg="This is a debug message"' in lines[1]
+        assert _LEVEL_DEBUG_FIELD in lines[1]
+        assert _DEBUG_MSG_FIELD in lines[1]
 
 
 def test_trace_level_filtering(clean_env):
@@ -59,11 +76,11 @@ def test_trace_level_filtering(clean_env):
         log_file = configure_logging(app_name)
         logger = get_logger("test_trace_filtering")
 
-        logger.trace("This should not appear")
-        logger.debug("This should appear")
+        logger.trace(_FILTERED_TRACE_MSG)
+        logger.debug(_FILTERED_DEBUG_MSG)
 
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             lines = f.readlines()
 
         assert len(lines) == 1
-        assert "level=DEBUG" in lines[0]
+        assert _LEVEL_DEBUG_FIELD in lines[0]

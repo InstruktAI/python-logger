@@ -4,8 +4,40 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-
 from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger
+
+# Log markers shared by each test and its assertions — named constants per
+# software-development/procedure/snapshot-testing (no bare literals in content
+# assertions). The logfmt field fragments are derived from the markers so the
+# expected output stays in sync with what is logged.
+_LOGGER_OURS = "teleclaude.core"
+_LOGGER_HTTPCORE = "httpcore.http11"
+_LOGGER_TELEGRAM = "telegram.ext.ExtBot"
+_LOGGER_MUTED = "teleclaude.cli.tui"
+
+_MSG_OURS = "hello from ours"
+_MSG_THIRD_PARTY = "hello from third-party"
+_MSG_HTTPCORE = "httpcore info"
+_MSG_TELEGRAM = "telegram info"
+_MSG_HELLO = "hello"
+_MSG_CORE_DEBUG = "core debug"
+_MSG_TUI_DEBUG = "tui debug"
+_MSG_TUI_WARNING = "tui warning"
+
+_KV_SESSION = "abc123"
+_KV_N = 1
+
+_FIELD_LOGGER_OURS = f"logger={_LOGGER_OURS}"
+_FIELD_LOGGER_HTTPCORE = f"logger={_LOGGER_HTTPCORE}"
+_FIELD_LOGGER_TELEGRAM = f"logger={_LOGGER_TELEGRAM}"
+_FIELD_LOGGER_MUTED = f"logger={_LOGGER_MUTED}"
+_FIELD_MSG_OURS = f'msg="{_MSG_OURS}"'
+_FIELD_MSG_HTTPCORE = f'msg="{_MSG_HTTPCORE}"'
+_FIELD_MSG_HELLO = f'msg="{_MSG_HELLO}"'
+_FIELD_MSG_CORE_DEBUG = f'msg="{_MSG_CORE_DEBUG}"'
+_FIELD_MSG_TUI_WARNING = f'msg="{_MSG_TUI_WARNING}"'
+_FIELD_SESSION = f"session={_KV_SESSION}"
+_FIELD_N = f"n={_KV_N}"
 
 
 @pytest.fixture()
@@ -38,13 +70,13 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
 
         log_path = configure_logging("teleclaude")
 
-        logging.getLogger("teleclaude.core").debug("hello from ours")
-        logging.getLogger("httpcore.http11").info("hello from third-party")
+        logging.getLogger(_LOGGER_OURS).debug(_MSG_OURS)
+        logging.getLogger(_LOGGER_HTTPCORE).info(_MSG_THIRD_PARTY)
 
         content = _read_text(log_path)
-        assert "logger=teleclaude.core" in content
-        assert 'msg="hello from ours"' in content
-        assert "logger=httpcore.http11" not in content
+        assert _FIELD_LOGGER_OURS in content
+        assert _FIELD_MSG_OURS in content
+        assert _FIELD_LOGGER_HTTPCORE not in content
 
 
 def test_configure_logging_uses_single_file_handler(isolated_logging, monkeypatch):
@@ -60,9 +92,9 @@ def test_configure_logging_uses_single_file_handler(isolated_logging, monkeypatc
 
 
 def test_get_logger_returns_instrukt_logger(isolated_logging):
-    logger = get_logger("teleclaude.core")
+    logger = get_logger(_LOGGER_OURS)
     assert isinstance(logger, InstruktAILogger)
-    logger.info("hello", session="abc123", n=1)
+    logger.info(_MSG_HELLO, session=_KV_SESSION, n=_KV_N)
 
 
 def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatch):
@@ -83,17 +115,17 @@ def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatc
         telegram_logger.setLevel(logging.INFO)
 
         try:
-            logging.getLogger("httpcore.http11").info("httpcore info")
-            logging.getLogger("telegram.ext.ExtBot").info("telegram info")
+            logging.getLogger(_LOGGER_HTTPCORE).info(_MSG_HTTPCORE)
+            logging.getLogger(_LOGGER_TELEGRAM).info(_MSG_TELEGRAM)
         finally:
             httpcore_logger.setLevel(previous_httpcore_level)
             telegram_logger.setLevel(previous_telegram_level)
 
         content = _read_text(log_path)
-        assert "logger=httpcore.http11" in content
-        assert 'msg="httpcore info"' in content
-        assert "logger=telegram.ext.ExtBot" not in content
-        assert "telegram info" not in content
+        assert _FIELD_LOGGER_HTTPCORE in content
+        assert _FIELD_MSG_HTTPCORE in content
+        assert _FIELD_LOGGER_TELEGRAM not in content
+        assert _MSG_TELEGRAM not in content
 
 
 def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
@@ -104,12 +136,12 @@ def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
 
         log_path = configure_logging("teleclaude")
 
-        logging.getLogger("teleclaude.core").info("hello", session="abc123", n=1)
+        logging.getLogger(_LOGGER_OURS).info(_MSG_HELLO, session=_KV_SESSION, n=_KV_N)
 
         content = _read_text(log_path)
-        assert 'msg="hello"' in content
-        assert "session=abc123" in content
-        assert "n=1" in content
+        assert _FIELD_MSG_HELLO in content
+        assert _FIELD_SESSION in content
+        assert _FIELD_N in content
 
 
 def test_muted_loggers_forced_to_warning(isolated_logging, monkeypatch):
@@ -117,20 +149,20 @@ def test_muted_loggers_forced_to_warning(isolated_logging, monkeypatch):
         monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "DEBUG")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
-        monkeypatch.setenv("TELECLAUDE_MUTED_LOGGERS", "teleclaude.cli.tui")
+        monkeypatch.setenv("TELECLAUDE_MUTED_LOGGERS", _LOGGER_MUTED)
 
         log_path = configure_logging("teleclaude")
 
-        logging.getLogger("teleclaude.core").debug("core debug")
-        logging.getLogger("teleclaude.cli.tui").debug("tui debug")
-        logging.getLogger("teleclaude.cli.tui").warning("tui warning")
+        logging.getLogger(_LOGGER_OURS).debug(_MSG_CORE_DEBUG)
+        logging.getLogger(_LOGGER_MUTED).debug(_MSG_TUI_DEBUG)
+        logging.getLogger(_LOGGER_MUTED).warning(_MSG_TUI_WARNING)
 
         content = _read_text(log_path)
         # Core debug should appear (app level is DEBUG)
-        assert "logger=teleclaude.core" in content
-        assert 'msg="core debug"' in content
+        assert _FIELD_LOGGER_OURS in content
+        assert _FIELD_MSG_CORE_DEBUG in content
         # Muted logger's debug should NOT appear (forced to WARNING)
-        assert "tui debug" not in content
+        assert _MSG_TUI_DEBUG not in content
         # Muted logger's warning SHOULD appear
-        assert "logger=teleclaude.cli.tui" in content
-        assert 'msg="tui warning"' in content
+        assert _FIELD_LOGGER_MUTED in content
+        assert _FIELD_MSG_TUI_WARNING in content

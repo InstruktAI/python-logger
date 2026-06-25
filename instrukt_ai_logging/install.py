@@ -7,6 +7,9 @@ import os
 import sys
 from pathlib import Path
 
+DEFAULT_NEWSYSLOG_CONF = Path("/etc/newsyslog.d/instrukt-ai.conf")
+DEFAULT_LOGROTATE_CONF = Path("/etc/logrotate.d/instrukt-ai")
+
 
 def _write_file(path: Path, content: str, *, force: bool) -> None:
     if path.exists() and not force:
@@ -15,24 +18,47 @@ def _write_file(path: Path, content: str, *, force: bool) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _install_newsyslog(log_root: Path, *, force: bool) -> Path:
-    """Install a glob-based newsyslog rule covering every app's *.log file.
+def _install_newsyslog(
+    log_root: Path,
+    *,
+    force: bool,
+    conf_path: Path = DEFAULT_NEWSYSLOG_CONF,
+) -> Path:
+    """Install newsyslog rules covering every app's *.log file.
 
     Format: path  owner:group  mode  count  size(KB)  when  flags
     Defaults: 50 MB rotation, 5 archives, gzip-compress archives (Z flag).
+
+    macOS newsyslog requires literal filenames — its config does NOT
+    expand globs at runtime. We therefore enumerate every existing
+    *.log file under log_root and emit one explicit line per file.
+    Re-run `instrukt-ai-log-setup --force` after a new producer creates
+    its first log file (which can be wired into the app's installer or
+    a daemon's periodic cleanup task).
     """
-    conf_path = Path("/etc/newsyslog.d/instrukt-ai.conf")
-    line = f"{log_root}/" + "*/*.log  640  5  50000  *  Z\n"
-    _write_file(conf_path, line, force=force)
+    if log_root.is_dir():
+        log_files = sorted(p for p in log_root.glob("*/*.log") if p.is_file())
+    else:
+        log_files = []
+    lines = "".join(f"{path}  640  5  50000  *  Z\n" for path in log_files)
+    if not lines:
+        # No log files yet — write a placeholder comment so the conf is
+        # discoverable on disk for future re-runs.
+        lines = f"# instrukt-ai-log-setup: no *.log files found under {log_root}\n"
+    _write_file(conf_path, lines, force=force)
     return conf_path
 
 
-def _install_logrotate(log_root: Path, *, force: bool) -> Path:
+def _install_logrotate(
+    log_root: Path,
+    *,
+    force: bool,
+    conf_path: Path = DEFAULT_LOGROTATE_CONF,
+) -> Path:
     """Install a glob-based logrotate rule covering every app's *.log file.
 
     Defaults: 50 MB rotation, 5 archives, gzip-compress archives.
     """
-    conf_path = Path("/etc/logrotate.d/instrukt-ai")
     content = f"""{log_root}/*/*.log {{
     size 50M
     rotate 5

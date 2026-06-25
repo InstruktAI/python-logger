@@ -6,8 +6,8 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from instrukt_ai_logging.logging import (
     iter_recent_log_lines_merged,
@@ -102,6 +102,15 @@ def _parse_stems(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _line_passes(line: str, *, keep: re.Pattern[str] | None, drop: re.Pattern[str] | None) -> bool:
+    """Apply the inclusive `--grep` keep filter then the `--exclude` drop filter."""
+    if keep is not None and not keep.search(line):
+        return False
+    if drop is not None and drop.search(line):
+        return False
+    return True
+
+
 def _stem_of(path: Path) -> str:
     """Return the stem before the first `.log` suffix (e.g. `cron.log.1` → `cron`)."""
     name = path.name
@@ -116,71 +125,21 @@ def _is_rotation_suffix(path: Path) -> bool:
     return idx > 0 and name[idx + len(".log") :] != ""
 
 
-def main() -> None:
-    from instrukt_ai_logging import __version__
+def _follow_files(
+    files: list[Path],
+    stems: list[str] | None,
+    *,
+    keep: re.Pattern[str] | None,
+    drop: re.Pattern[str] | None,
+) -> None:
+    """Follow each selected file concurrently, applying the keep/drop filters.
 
-    parser = argparse.ArgumentParser(prog="instrukt-ai-logs", add_help=True)
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-    parser.add_argument("app", help="App/service name (folder under /var/log/instrukt-ai/)")
-    parser.add_argument(
-        "--since", default="10m", help="Time window (e.g. 10m, 2h, 1d). Default: 10m"
-    )
-    parser.add_argument(
-        "-f",
-        "--follow",
-        action="store_true",
-        help="Follow the log (tail -f style) after printing the --since window",
-    )
-    parser.add_argument("--grep", default="", help="Regex to filter lines (optional)")
-    parser.add_argument(
-        "--logs",
-        default="",
-        help=(
-            "Comma-separated list of stems to include (e.g. 'cron,docs-watch'). "
-            "Default: all log files in the app's directory."
-        ),
-    )
-    args = parser.parse_args()
-
-    try:
-        since = parse_since(args.since)
-    except ValueError as e:
-        raise SystemExit(str(e)) from e
-
-    pattern = re.compile(args.grep) if args.grep else None
-    stems = _parse_stems(args.logs) or None
-
-    files = resolve_log_files(args.app, stems=stems)
-    if not files:
-        if stems:
-            available = sorted({_stem_of(p) for p in resolve_log_files(args.app)})
-            available_str = ", ".join(available) if available else "(none)"
-            raise SystemExit(
-                f"No log files matched stems {stems} in app '{args.app}'. "
-                f"Available: {available_str}"
-            )
-        raise SystemExit(f"No log files found for app '{args.app}'")
-
-    for line in iter_recent_log_lines_merged(files, since):
-        if pattern and not pattern.search(line):
-            continue
-        sys.stdout.write(line)
-
-    if not args.follow:
-        return
-
-    sys.stdout.flush()
-
-    # Follow each selected file concurrently. New lines from any file are
-    # written to stdout as they arrive — no cross-file timestamp merge in
-    # follow mode, since real-time arrival ordering is its own merge.
-    # Filter to files that actually exist for the canonical (default) glob —
-    # for the explicit `--logs=` case, follow each named stem's canonical
-    # file (the unsuffixed `<stem>.log`) so we don't follow rotated history.
+    New lines from any file are written to stdout as they arrive — no cross-file
+    timestamp merge in follow mode, since real-time arrival ordering is its own
+    merge. For the explicit `--logs`/`--include` case, follow each named stem's
+    canonical `<stem>.log` so we don't follow rotated history.
+    """
+    follow_files: list[Path]
     if stems is None:
         follow_files = [p for p in files if not _is_rotation_suffix(p)]
     else:
@@ -201,7 +160,7 @@ def main() -> None:
             for line in iter_follow_lines(path, start_at_end=True):
                 if stop_event.is_set():
                     return
-                if pattern and not pattern.search(line):
+                if not _line_passes(line, keep=keep, drop=drop):
                     continue
                 sys.stdout.write(line)
                 sys.stdout.flush()
@@ -222,3 +181,65 @@ def main() -> None:
     except KeyboardInterrupt:
         stop_event.set()
         return
+
+
+def main() -> None:
+    from instrukt_ai_logging import __version__
+
+    parser = argparse.ArgumentParser(prog="instrukt-ai-logs", add_help=True)
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    parser.add_argument("app", help="App/service name (folder under /var/log/instrukt-ai/)")
+    parser.add_argument("--since", default="10m", help="Time window (e.g. 10m, 2h, 1d). Default: 10m")
+    parser.add_argument(
+        "-f",
+        "--follow",
+        action="store_true",
+        help="Follow the log (tail -f style) after printing the --since window",
+    )
+    parser.add_argument("--grep", default="", help="Regex to keep only matching lines (optional)")
+    parser.add_argument(
+        "--exclude",
+        default="",
+        help="Regex to drop matching lines (applied after --grep; optional)",
+    )
+    parser.add_argument(
+        "--logs",
+        "--include",
+        default="",
+        help=(
+            "Comma-separated list of stems to include (e.g. 'cron,docs-watch'). "
+            "Default: all log files in the app's directory. Alias: --include."
+        ),
+    )
+    args = parser.parse_args()
+
+    try:
+        since = parse_since(args.since)
+    except ValueError as e:
+        raise SystemExit(str(e)) from e
+
+    pattern = re.compile(args.grep) if args.grep else None
+    exclude_pattern = re.compile(args.exclude) if args.exclude else None
+    stems = _parse_stems(args.logs) or None
+
+    files = resolve_log_files(args.app, stems=stems)
+    if not files:
+        if stems:
+            available = sorted({_stem_of(p) for p in resolve_log_files(args.app)})
+            available_str = ", ".join(available) if available else "(none)"
+            raise SystemExit(f"No log files matched stems {stems} in app '{args.app}'. Available: {available_str}")
+        raise SystemExit(f"No log files found for app '{args.app}'")
+
+    for line in iter_recent_log_lines_merged(files, since):
+        if _line_passes(line, keep=pattern, drop=exclude_pattern):
+            sys.stdout.write(line)
+
+    if not args.follow:
+        return
+
+    sys.stdout.flush()
+    _follow_files(files, stems, keep=pattern, drop=exclude_pattern)

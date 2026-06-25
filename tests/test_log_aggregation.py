@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import UTC, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-
+from instrukt_ai_logging.cli import main
 from instrukt_ai_logging.logging import (
     iter_recent_log_lines_merged,
     resolve_log_files,
@@ -16,6 +17,23 @@ from instrukt_ai_logging.logging import (
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+# Log markers shared by each fixture and its assertions — named constants per
+# software-development/procedure/snapshot-testing (no bare literals in content
+# assertions).
+_MSG_FRESH = "fresh"
+_MSG_BOOM = "boom"
+_MSG_AFTER = "after"
+_TRACEBACK_LINE = "  Traceback (most recent call last):"
+_FILE_LINE = "  File 'foo.py', line 1"
+_MSG_KEEP = "keep-me"
+_MSG_GIT_NOISE = "git-noise"
+_MSG_REAL_ERROR = "real-error"
+_MSG_GIT_ERROR = "git-error"
+_MSG_INFO = "info-line"
+_MSG_CRON = "cron-line"
+_MSG_DAEMON = "daemon-line"
 
 
 @pytest.fixture()
@@ -68,9 +86,9 @@ def test_resolve_log_files_returns_empty_when_dir_missing(monkeypatch: pytest.Mo
 
 
 def _now_iso(offset_minutes: int = 0) -> str:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    dt = datetime.now(tz=timezone.utc) + timedelta(minutes=offset_minutes)
+    dt = datetime.now(tz=UTC) + timedelta(minutes=offset_minutes)
     return dt.strftime("%Y-%m-%dT%H:%M:%S") + f".{int(dt.microsecond / 1000):03d}Z"
 
 
@@ -101,21 +119,21 @@ def test_iter_recent_log_lines_merged_respects_since_cutoff(app_log_dir: Path) -
     daemon = app_log_dir / "demo-app.log"
     daemon.write_text(
         f"{_now_iso(-30)} level=INFO logger=demo.daemon msg=old\n"
-        f"{_now_iso(-1)} level=INFO logger=demo.daemon msg=fresh\n",
+        f"{_now_iso(-1)} level=INFO logger=demo.daemon msg={_MSG_FRESH}\n",
         encoding="utf-8",
     )
 
     files = resolve_log_files("demo-app")
     lines = list(iter_recent_log_lines_merged(files, since=timedelta(minutes=5)))
     assert len(lines) == 1
-    assert "fresh" in lines[0]
+    assert _MSG_FRESH in lines[0]
 
 
 def test_iter_recent_log_lines_merged_skips_files_with_mtime_before_cutoff(
     app_log_dir: Path,
 ) -> None:
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     fresh = app_log_dir / "demo-app.log"
     fresh.write_text(
@@ -128,7 +146,7 @@ def test_iter_recent_log_lines_merged_skips_files_with_mtime_before_cutoff(
         encoding="utf-8",
     )
     # Force stale.log's mtime to 1 day ago — older than --since=10m cutoff.
-    one_day_ago = (datetime.now(tz=timezone.utc) - timedelta(days=1)).timestamp()
+    one_day_ago = (datetime.now(tz=UTC) - timedelta(days=1)).timestamp()
     os.utime(stale, (one_day_ago, one_day_ago))
 
     files = resolve_log_files("demo-app")
@@ -142,17 +160,78 @@ def test_iter_recent_log_lines_merged_keeps_continuation_lines_with_parent(
 ) -> None:
     daemon = app_log_dir / "demo-app.log"
     daemon.write_text(
-        f"{_now_iso(-1)} level=ERROR logger=demo.daemon msg=boom\n"
-        f"  Traceback (most recent call last):\n"
-        f"  File 'foo.py', line 1\n"
-        f"{_now_iso(0)} level=INFO logger=demo.daemon msg=after\n",
+        f"{_now_iso(-1)} level=ERROR logger=demo.daemon msg={_MSG_BOOM}\n"
+        f"{_TRACEBACK_LINE}\n"
+        f"{_FILE_LINE}\n"
+        f"{_now_iso(0)} level=INFO logger=demo.daemon msg={_MSG_AFTER}\n",
         encoding="utf-8",
     )
 
     files = resolve_log_files("demo-app")
     lines = list(iter_recent_log_lines_merged(files, since=timedelta(minutes=10)))
     assert len(lines) == 4
-    assert "boom" in lines[0]
-    assert lines[1].startswith("  Traceback")
-    assert lines[2].startswith("  File")
-    assert "after" in lines[3]
+    assert _MSG_BOOM in lines[0]
+    assert lines[1].startswith(_TRACEBACK_LINE)
+    assert lines[2].startswith(_FILE_LINE)
+    assert _MSG_AFTER in lines[3]
+
+
+def test_cli_exclude_drops_matching_lines(
+    app_log_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    daemon = app_log_dir / "demo-app.log"
+    daemon.write_text(
+        f"{_now_iso(-1)} level=ERROR logger=demo.git.exec msg={_MSG_GIT_NOISE}\n"
+        f"{_now_iso(0)} level=INFO logger=demo.daemon msg={_MSG_KEEP}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(sys, "argv", ["instrukt-ai-logs", "demo-app", "--exclude", r"logger=demo\.git\.exec"])
+    main()
+
+    out = capsys.readouterr().out
+    assert _MSG_KEEP in out
+    assert _MSG_GIT_NOISE not in out
+
+
+def test_cli_exclude_applies_after_grep(
+    app_log_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    daemon = app_log_dir / "demo-app.log"
+    daemon.write_text(
+        f"{_now_iso(-2)} level=ERROR logger=demo.git.exec msg={_MSG_GIT_ERROR}\n"
+        f"{_now_iso(-1)} level=ERROR logger=demo.daemon msg={_MSG_REAL_ERROR}\n"
+        f"{_now_iso(0)} level=INFO logger=demo.daemon msg={_MSG_INFO}\n",
+        encoding="utf-8",
+    )
+
+    # Keep only ERROR lines, then drop the git seam ones.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["instrukt-ai-logs", "demo-app", "--grep", "level=ERROR", "--exclude", r"logger=demo\.git\.exec"],
+    )
+    main()
+
+    out = capsys.readouterr().out
+    assert _MSG_REAL_ERROR in out
+    assert _MSG_GIT_ERROR not in out
+    assert _MSG_INFO not in out
+
+
+def test_cli_include_alias_matches_logs_flag(
+    app_log_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (app_log_dir / "demo-app.log").write_text(
+        f"{_now_iso(0)} level=INFO logger=demo.daemon msg={_MSG_DAEMON}\n", encoding="utf-8"
+    )
+    (app_log_dir / "cron.log").write_text(
+        f"{_now_iso(0)} level=INFO logger=demo.cron msg={_MSG_CRON}\n", encoding="utf-8"
+    )
+
+    monkeypatch.setattr(sys, "argv", ["instrukt-ai-logs", "demo-app", "--include", "cron"])
+    main()
+
+    out = capsys.readouterr().out
+    assert _MSG_CRON in out
+    assert _MSG_DAEMON not in out
