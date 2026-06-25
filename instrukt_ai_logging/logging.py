@@ -4,17 +4,18 @@ import heapq
 import logging
 import os
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Protocol, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 # Standard logging levels are: NOTSET=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
 TRACE: int = 5
 logging.addLevelName(TRACE, "TRACE")
 # Monkey-patch logging so our _level_name_to_int helper finds it automatically.
-setattr(logging, "TRACE", TRACE)
+logging.TRACE = TRACE  # type: ignore[attr-defined]
 
 
 def _normalize_env_prefix(name: str) -> str:
@@ -68,12 +69,12 @@ def _parse_csv(value: str) -> list[str]:
 
 
 def _now_utc() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 class UtcMillisFormatter(logging.Formatter):
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
-        dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        dt = datetime.fromtimestamp(record.created, tz=UTC)
         if datefmt:
             return dt.strftime(datefmt)
         return dt.strftime("%Y-%m-%dT%H:%M:%S") + f".{int(record.msecs):03d}Z"
@@ -161,18 +162,17 @@ class LogfmtFormatter(UtcMillisFormatter):
             f"msg={_format_logfmt_string(str(message), max_chars=self.max_message_chars, force_quote=True)}",
         ]
 
-        kv: object = getattr(record, "kv", None)
-        if isinstance(kv, dict):
-            for key in sorted(kv.keys(), key=lambda x: str(x)):
+        raw_kv: object = getattr(record, "kv", None)
+        if isinstance(raw_kv, dict):
+            kv = cast("dict[object, object]", raw_kv)
+            for key in sorted(kv.keys(), key=lambda k: str(k)):
                 if key == "msg":
                     continue
                 if not isinstance(key, str):
                     continue
                 if not _SAFE_KEY.fullmatch(key):
                     continue
-                parts.append(
-                    f"{key}={_format_logfmt_value(kv[key], max_chars=self.max_message_chars)}"
-                )
+                parts.append(f"{key}={_format_logfmt_value(kv[key], max_chars=self.max_message_chars)}")
 
         if record.exc_info:
             try:
@@ -216,9 +216,7 @@ class InstruktAILogger(logging.Logger):
     All `**kv` values are serialized to text by the formatter.
     """
 
-    def _log_with_kv(
-        self, level: int, msg: object, args: tuple[object, ...], **kwargs: Any
-    ) -> None:
+    def _log_with_kv(self, level: int, msg: object, args: tuple[object, ...], **kwargs: Any) -> None:
         exc_info = kwargs.pop("exc_info", None)
         stack_info = kwargs.pop("stack_info", False)
         stacklevel = kwargs.pop("stacklevel", 1)
@@ -229,7 +227,7 @@ class InstruktAILogger(logging.Logger):
 
         merged_extra: dict[str, object] = {}
         if isinstance(extra, dict):
-            merged_extra.update(extra)
+            merged_extra.update(cast("dict[str, object]", extra))
 
         existing_kv = merged_extra.get("kv")
         if isinstance(existing_kv, dict):
@@ -277,7 +275,7 @@ class InstruktAILogger(logging.Logger):
             self._log_with_kv(logging.ERROR, msg, args, **kwargs)
 
     def log(self, level: int, msg: object, *args: object, **kwargs: Any) -> None:  # type: ignore[override]
-        if not isinstance(level, int):
+        if not isinstance(level, int):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("level must be an int")
         if self.isEnabledFor(level):
             self._log_with_kv(level, msg, args, **kwargs)
@@ -313,7 +311,7 @@ class _ThirdPartySelectorFilter(logging.Filter):
         self.app_logger_prefix = app_logger_prefix
         self.spotlight_prefixes = spotlight_prefixes
 
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+    def filter(self, record: logging.LogRecord) -> bool:
         name = record.name
         if name == self.app_logger_prefix or name.startswith(self.app_logger_prefix + "."):
             return True
@@ -466,9 +464,7 @@ def configure_logging(
     handler.setLevel(logging.NOTSET)
     handler.setFormatter(formatter)
     handler.addFilter(
-        _ThirdPartySelectorFilter(
-            app_logger_prefix=app_logger_prefix, spotlight_prefixes=tuple(spotlight)
-        )
+        _ThirdPartySelectorFilter(app_logger_prefix=app_logger_prefix, spotlight_prefixes=tuple(spotlight))
     )
 
     # Configure root.
@@ -532,11 +528,7 @@ def iter_recent_log_lines(log_file: Path, since: timedelta) -> list[str]:
     cutoff = _now_utc() - since
 
     candidates = sorted(
-        [
-            p
-            for p in log_file.parent.glob(log_file.name + "*")
-            if p.is_file() and not p.name.endswith(".gz")
-        ],
+        [p for p in log_file.parent.glob(log_file.name + "*") if p.is_file() and not p.name.endswith(".gz")],
         key=lambda p: p.stat().st_mtime,
     )
 
@@ -597,7 +589,7 @@ def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Ite
     eligible: list[Path] = []
     for path in files:
         try:
-            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
         except OSError:
             continue
         if mtime < cutoff:

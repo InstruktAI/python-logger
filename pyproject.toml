@@ -10,8 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
 
-[project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.8"]
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8", "pyright>=1.1", "mypy>=1.10"]
 
 [project.scripts]
 instrukt-ai-logs = "instrukt_ai_logging.cli:main"
@@ -29,5 +29,58 @@ addopts = "-q"
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py311"
+src = ["instrukt_ai_logging", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "C90", "B", "UP", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+include = ["instrukt_ai_logging", "tests"]
+# Flat layout: the package lives at the repo root, so add it as an import source
+# for files outside the package (e.g. tests importing `instrukt_ai_logging`).
+extraPaths = ["."]
+
+# Strict typing guards the library; the test suite is exercised by pytest, not by
+# strict static typing. Relax the strict-only "unknown type" family for tests so
+# unannotated fixtures and pytest's own surfaces do not block lint.
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportMissingParameterType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownLambdaType = false
+reportPrivateUsage = false
+reportCallIssue = false
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["instrukt_ai_logging"]
+# mypy is unpinned (mypy>=1.10); keep defensive `type: ignore`s that a given
+# version may not need rather than flagging them and breaking on version drift.
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+ignore_missing_imports = true
+
+[tool.guardrails]
+max_ignore_files = 8
+max_global_ignores = 8
+max_per_file_ignores = 50
+max_override_sections = 13
+max_module_lines = 1000
+required_rule_groups = ["E", "F", "I", "C90", "B", "UP", "RUF"]
