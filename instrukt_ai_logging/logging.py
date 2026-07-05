@@ -548,6 +548,46 @@ def iter_recent_log_lines(log_file: Path, since: timedelta) -> list[str]:
     return lines
 
 
+# Initial backward-probe size for locating the start of the --since window in a
+# large file. A typical multi-minute window fits in one or two probes; the probe
+# doubles when the window is larger, so worst case is still O(window), not O(file).
+_WINDOW_PROBE_BYTES = 262144  # 256 KiB
+
+
+def _window_start_offset(path: Path, cutoff: datetime) -> int:
+    """Return a byte offset at or before the first line newer than `cutoff`.
+
+    A log file is appended in timestamp order, so the window's start can be found
+    by probing backward from EOF in exponentially growing chunks instead of
+    scanning from byte 0: once a probe's earliest timestamped line is already
+    older than the cutoff, the window begins within that probe and everything
+    before it is skippable. Returns 0 when the window spans the whole file (or the
+    file is smaller than a single probe), which reproduces a full forward scan.
+    """
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return 0
+    if size <= _WINDOW_PROBE_BYTES:
+        return 0
+
+    probe = _WINDOW_PROBE_BYTES
+    with path.open("rb") as fb:
+        while probe < size:
+            start = size - probe
+            fb.seek(start)
+            fb.readline()  # discard the partial line spanning the probe boundary
+            first_ts: datetime | None = None
+            for raw in fb:
+                first_ts = parse_log_timestamp(raw.decode("utf-8", errors="replace"))
+                if first_ts is not None:
+                    break
+            if first_ts is not None and first_ts < cutoff:
+                return start
+            probe *= 2
+    return 0
+
+
 def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Iterator[str]:
     """Yield lines newer than now-`since` merged across multiple files by timestamp.
 
@@ -567,12 +607,17 @@ def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Ite
 
     def _file_stream(path: Path) -> Iterator[tuple[datetime, str]]:
         try:
-            f = path.open("r", encoding="utf-8", errors="replace")
+            fb = path.open("rb")
         except FileNotFoundError:
             return
         try:
+            offset = _window_start_offset(path, cutoff)
+            if offset:
+                fb.seek(offset)
+                fb.readline()  # discard the partial line at the seek boundary
             last_ts: datetime | None = None
-            for line in f:
+            for raw in fb:
+                line = raw.decode("utf-8", errors="replace")
                 ts = parse_log_timestamp(line)
                 if ts is None:
                     if last_ts is None or last_ts < cutoff:
@@ -584,7 +629,7 @@ def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Ite
                     continue
                 yield (ts, line)
         finally:
-            f.close()
+            fb.close()
 
     eligible: list[Path] = []
     for path in files:

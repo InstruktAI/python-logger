@@ -34,6 +34,9 @@ _MSG_GIT_ERROR = "git-error"
 _MSG_INFO = "info-line"
 _MSG_CRON = "cron-line"
 _MSG_DAEMON = "daemon-line"
+_MSG_OLD_PREFIX = "msg=old-"
+_MSG_LINE_PREFIX = "msg=line-"
+_LARGE_LINE_COUNT = 20000
 
 
 @pytest.fixture()
@@ -174,6 +177,59 @@ def test_iter_recent_log_lines_merged_keeps_continuation_lines_with_parent(
     assert lines[1].startswith(_TRACEBACK_LINE)
     assert lines[2].startswith(_FILE_LINE)
     assert _MSG_AFTER in lines[3]
+
+
+def test_iter_recent_log_lines_merged_reads_tail_window_of_large_file(
+    app_log_dir: Path,
+) -> None:
+    # A large body of old lines (well past the 256 KiB backward probe) followed by
+    # a recent window that includes a multi-line entry. The reader must return only
+    # the recent lines — proving it locates the window near EOF rather than scanning
+    # the whole file — and must keep the continuation line with its parent across
+    # the seek boundary.
+    daemon = app_log_dir / "demo-app.log"
+    old_block = "".join(
+        f"{_now_iso(-30)} level=INFO logger=demo.daemon {_MSG_OLD_PREFIX}{i}\n" for i in range(_LARGE_LINE_COUNT)
+    )
+    recent_block = (
+        f"{_now_iso(-1)} level=ERROR logger=demo.daemon msg={_MSG_BOOM}\n"
+        f"{_TRACEBACK_LINE}\n"
+        f"{_now_iso(0)} level=INFO logger=demo.daemon msg={_MSG_AFTER}\n"
+    )
+    daemon.write_text(old_block + recent_block, encoding="utf-8")
+    assert daemon.stat().st_size > 262144  # forces the backward-probe path (offset > 0)
+
+    files = resolve_log_files("demo-app")
+    lines = list(iter_recent_log_lines_merged(files, since=timedelta(minutes=5)))
+    assert len(lines) == 3
+    assert _MSG_BOOM in lines[0]
+    assert lines[1].startswith(_TRACEBACK_LINE)
+    assert _MSG_AFTER in lines[2]
+    assert all(_MSG_OLD_PREFIX not in line for line in lines)
+
+
+def test_iter_recent_log_lines_merged_returns_whole_large_file_within_window(
+    app_log_dir: Path,
+) -> None:
+    # Every line is inside the window but the file exceeds one probe: the backward
+    # probe must grow to the file start (offset 0) and return all lines, not just
+    # the final probe's worth.
+    daemon = app_log_dir / "demo-app.log"
+    daemon.write_text(
+        "".join(
+            f"{_now_iso(-1)} level=INFO logger=demo.daemon {_MSG_LINE_PREFIX}{i}\n" for i in range(_LARGE_LINE_COUNT)
+        ),
+        encoding="utf-8",
+    )
+    assert daemon.stat().st_size > 262144
+
+    files = resolve_log_files("demo-app")
+    lines = list(iter_recent_log_lines_merged(files, since=timedelta(minutes=5)))
+    assert len(lines) == _LARGE_LINE_COUNT
+    first_marker = f"{_MSG_LINE_PREFIX}0"
+    last_marker = f"{_MSG_LINE_PREFIX}{_LARGE_LINE_COUNT - 1}"
+    assert first_marker in lines[0]
+    assert last_marker in lines[-1]
 
 
 def test_cli_exclude_drops_matching_lines(
