@@ -1,6 +1,2 @@
-business:
-  domains:
-    software-development: docs
-languages:
-  - python
+business: {}
 project_slug: python-logger
