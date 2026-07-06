@@ -107,8 +107,10 @@ detect platform
 
 ```
 detect platform
-  → resolve the producer owner:group (SUDO_USER → existing app-log-dir owner →
-    invoking user; omitted with a stderr warning when only root resolves)
+  → resolve each file's producer owner:group from its app-log-dir owner →
+    SUDO_USER → invoking user (the existing app-dir owner wins, so a --force rerun
+    by a different admin preserves the producer; omitted with a stderr warning
+    when only root resolves)
   → macOS: enumerate every <log_root>/*/*.log file (newsyslog cannot expand
     globs at rotation time) and emit one explicit line per file with
     "<owner>:<group>  640  5  50000  *  Z" defaults (gzip-compress 5 archives at
@@ -146,10 +148,11 @@ exist_ok=True)` — if `/var/log/instrukt-ai/` is not writable this raises, and
 - **Rotation ownership.** macOS newsyslog runs as root under launchd; without an
   `owner:group` field it recreates the rotated file root-owned, which the non-root
   producer can no longer open. `_install_newsyslog` bakes the producer's
-  `owner:group` into each line (resolved from `SUDO_USER`, else the existing app
-  log directory's owner, else the invoking user), so rotation preserves ownership.
-  When only root resolves, the field is omitted and a stderr warning tells the
-  operator to re-run under the producer account.
+  `owner:group` into each line (resolved per file from the existing app log
+  directory's owner, else `SUDO_USER`, else the invoking user — the established
+  producer owner wins over the account running a `--force` rerun), so rotation
+  preserves ownership. When only root resolves, the field is omitted and a stderr
+  warning tells the operator to re-run under the producer account.
 
 <!-- /planned:rotation-drops-log-ownership -->
 
