@@ -40,7 +40,7 @@ def test_trace_level_logging(clean_env):
 
     # Use a temporary directory for logs
     with tempfile.TemporaryDirectory() as temp_dir:
-        os.environ["INSTRUKT_AI_LOG_ROOT"] = temp_dir
+        os.environ["XDG_STATE_HOME"] = temp_dir
 
         log_file = configure_logging(app_name)
         logger = get_logger("test_trace_app")
@@ -71,7 +71,7 @@ def test_trace_level_filtering(clean_env):
     os.environ["TEST_TRACE_FILTERING_LOG_LEVEL"] = "DEBUG"
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        os.environ["INSTRUKT_AI_LOG_ROOT"] = temp_dir
+        os.environ["XDG_STATE_HOME"] = temp_dir
 
         log_file = configure_logging(app_name)
         logger = get_logger("test_trace_filtering")

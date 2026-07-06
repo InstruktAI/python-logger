@@ -11,6 +11,8 @@ from logging.handlers import WatchedFileHandler
 from pathlib import Path
 from typing import Any, Protocol, cast, runtime_checkable
 
+from instrukt_ai_logging.install import ensure_rotation
+
 # Standard logging levels are: NOTSET=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
 TRACE: int = 5
 logging.addLevelName(TRACE, "TRACE")
@@ -345,10 +347,9 @@ class LoggingContract:
 
 def _resolve_log_root(app_name: str) -> Path:
     fs_app_name = _normalize_app_name(app_name)
-    override = os.getenv("INSTRUKT_AI_LOG_ROOT")
-    if override:
-        return Path(override).expanduser() / fs_app_name
-    return Path("/var/log/instrukt-ai") / fs_app_name
+    xdg_state_home = os.getenv("XDG_STATE_HOME")
+    state_home = Path(xdg_state_home).expanduser() if xdg_state_home else Path("~/.local/state").expanduser()
+    return state_home / "instrukt-ai" / fs_app_name
 
 
 def _ensure_log_dir(log_dir: Path) -> None:
@@ -454,18 +455,19 @@ def configure_logging(
     root_level = third_party_level if not spotlight else logging.WARNING
 
     log_dir = _resolve_log_root(app_name)
-    _ensure_log_dir(log_dir)
-
     log_file = log_dir / log_filename
 
     formatter = LogfmtFormatter(max_message_chars=max_message_chars)
+    selector = _ThirdPartySelectorFilter(app_logger_prefix=app_logger_prefix, spotlight_prefixes=tuple(spotlight))
 
-    handler = WatchedFileHandler(log_file, encoding="utf-8")
+    # Logging is an essential subsystem: an unwritable log dir/file raises here
+    # and the host process must not start blind. No degraded/fallback mode.
+    _ensure_log_dir(log_dir)
+    handler: logging.Handler = WatchedFileHandler(log_file, encoding="utf-8")
+
     handler.setLevel(logging.NOTSET)
     handler.setFormatter(formatter)
-    handler.addFilter(
-        _ThirdPartySelectorFilter(app_logger_prefix=app_logger_prefix, spotlight_prefixes=tuple(spotlight))
-    )
+    handler.addFilter(selector)
 
     # Configure root.
     logging.root.handlers = [handler]
@@ -483,6 +485,11 @@ def configure_logging(
     # Muted loggers are forced to WARNING+ (applies to both app and third-party).
     for prefix in muted:
         logging.getLogger(prefix).setLevel(logging.WARNING)
+
+    # Rotation bootstrap is not logging: a failure here is surfaced as a
+    # warning, never fatal to an already-working log file.
+    for problem in ensure_rotation():
+        logging.getLogger(app_logger_prefix).warning("log rotation ensure problem: %s", problem)
 
     return log_file
 

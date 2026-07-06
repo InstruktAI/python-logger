@@ -43,9 +43,9 @@ _LARGE_LINE_COUNT = 20000
 def app_log_dir(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     tmp = TemporaryDirectory()
     root = Path(tmp.name)
-    monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", str(root))
+    monkeypatch.setenv("XDG_STATE_HOME", str(root))
 
-    app_dir = root / "demo-app"
+    app_dir = root / "instrukt-ai" / "demo-app"
     app_dir.mkdir(parents=True)
     yield app_dir
     tmp.cleanup()
@@ -83,7 +83,7 @@ def test_resolve_log_files_returns_empty_for_unknown_stem(app_log_dir: Path) -> 
 
 def test_resolve_log_files_returns_empty_when_dir_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
         # Directory for the app does not exist.
         assert resolve_log_files("nonexistent-app") == []
 

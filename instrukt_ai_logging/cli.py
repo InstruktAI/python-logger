@@ -192,7 +192,9 @@ def main() -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    parser.add_argument("app", help="App/service name (folder under /var/log/instrukt-ai/)")
+    parser.add_argument(
+        "app", help="App/service name (folder under $XDG_STATE_HOME/instrukt-ai/, fallback ~/.local/state)"
+    )
     parser.add_argument("--since", default="10m", help="Time window (e.g. 10m, 2h, 1d). Default: 10m")
     parser.add_argument(
         "-f",

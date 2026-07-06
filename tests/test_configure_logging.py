@@ -1,10 +1,11 @@
 import logging
+import os
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger
+from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger, install
 
 # Log markers shared by each test and its assertions — named constants per
 # software-development/procedure/snapshot-testing (no bare literals in content
@@ -39,6 +40,10 @@ _FIELD_MSG_TUI_WARNING = f'msg="{_MSG_TUI_WARNING}"'
 _FIELD_SESSION = f"session={_KV_SESSION}"
 _FIELD_N = f"n={_KV_N}"
 
+_APP_NAME = "teleclaude"
+_ROTATION_PROBLEM_MARKER = "log rotation ensure problem"
+_ROTATION_FAILURE_REASON = "no session bus"
+
 
 @pytest.fixture()
 def isolated_logging():
@@ -63,7 +68,7 @@ def _read_text(path: Path) -> str:
 
 def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, monkeypatch):
     with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "DEBUG")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
         monkeypatch.delenv("TELECLAUDE_THIRD_PARTY_LOGGERS", raising=False)
@@ -81,7 +86,7 @@ def test_our_logs_respect_app_level_and_third_party_baseline(isolated_logging, m
 
 def test_configure_logging_uses_single_file_handler(isolated_logging, monkeypatch):
     with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
 
@@ -89,6 +94,81 @@ def test_configure_logging_uses_single_file_handler(isolated_logging, monkeypatc
 
         assert len(logging.root.handlers) == 1
         assert isinstance(logging.root.handlers[0], WatchedFileHandler)
+
+
+def test_configure_logging_fails_fast_when_file_unwritable(isolated_logging, monkeypatch):
+    with TemporaryDirectory() as tmp:
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
+        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
+        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
+
+        # Pre-create the target log file at the path configure_logging resolves,
+        # then strip all permissions to simulate a root-owned/unwritable file
+        # left behind by a botched log rotation.
+        app_dir = Path(tmp) / "instrukt-ai" / _APP_NAME
+        app_dir.mkdir(parents=True, exist_ok=True)
+        log_path = app_dir / f"{_APP_NAME}.log"
+        log_path.write_text("", encoding="utf-8")
+        os.chmod(log_path, 0)
+
+        try:
+            # Logging is an essential subsystem: an unopenable log file must
+            # raise, never silently degrade.
+            with pytest.raises(PermissionError):
+                configure_logging(_APP_NAME)
+        finally:
+            # Restore permissions so the TemporaryDirectory cleanup can unlink it.
+            os.chmod(log_path, 0o644)
+
+
+class _FakeFailingCompletedProcess:
+    def __init__(self) -> None:
+        self.returncode = 1
+        self.stderr = _ROTATION_FAILURE_REASON
+        self.stdout = ""
+
+
+def test_configure_logging_warns_without_raising_when_rotation_ensure_fails(isolated_logging, monkeypatch):
+    with TemporaryDirectory() as tmp:
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
+        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
+        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
+
+        def _fake_run(args):
+            return _FakeFailingCompletedProcess()
+
+        monkeypatch.setattr(install, "_run_scheduler_command", _fake_run)
+
+        # A rotation-ensure failure must never crash logging — it's surfaced
+        # as a WARNING through the configured logger, not raised.
+        log_path = configure_logging(_APP_NAME)
+
+        content = _read_text(log_path)
+        assert _ROTATION_PROBLEM_MARKER in content
+        assert _ROTATION_FAILURE_REASON in content
+
+
+def test_configure_logging_resolves_xdg_state_home_location(isolated_logging, monkeypatch):
+    with TemporaryDirectory() as tmp:
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
+        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
+        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
+
+        log_path = configure_logging(_APP_NAME)
+
+        assert log_path == Path(tmp) / "instrukt-ai" / _APP_NAME / f"{_APP_NAME}.log"
+
+
+def test_configure_logging_falls_back_to_local_state_home_when_xdg_unset(isolated_logging, monkeypatch):
+    with TemporaryDirectory() as tmp:
+        monkeypatch.delenv("XDG_STATE_HOME", raising=False)
+        monkeypatch.setenv("HOME", tmp)
+        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
+        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
+
+        log_path = configure_logging(_APP_NAME)
+
+        assert log_path == Path(tmp) / ".local" / "state" / "instrukt-ai" / _APP_NAME / f"{_APP_NAME}.log"
 
 
 def test_get_logger_returns_instrukt_logger(isolated_logging):
@@ -99,7 +179,7 @@ def test_get_logger_returns_instrukt_logger(isolated_logging):
 
 def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatch):
     with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOGGERS", "httpcore")
@@ -130,7 +210,7 @@ def test_spotlight_allows_selected_third_party_only(isolated_logging, monkeypatc
 
 def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
     with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
 
@@ -146,7 +226,7 @@ def test_named_kv_logger_emits_pairs(isolated_logging, monkeypatch):
 
 def test_muted_loggers_forced_to_warning(isolated_logging, monkeypatch):
     with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)
+        monkeypatch.setenv("XDG_STATE_HOME", tmp)
         monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "DEBUG")
         monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
         monkeypatch.setenv("TELECLAUDE_MUTED_LOGGERS", _LOGGER_MUTED)

@@ -51,8 +51,8 @@ configure_logging("teleclaude", source="cron")        # → cron.log
 ```
 
 The `.log` extension is always appended; pass the bare stem. Files all live
-under `/var/log/instrukt-ai/{app}/`. The CLI merges them transparently
-(see below).
+under `$XDG_STATE_HOME/instrukt-ai/{app}/` (fallback `~/.local/state`). The CLI
+merges them transparently (see below).
 
 ## Environment variables (contract)
 
@@ -63,17 +63,32 @@ Per-app prefix model (example uses `TELECLAUDE_`):
 - `TELECLAUDE_THIRD_PARTY_LOGGERS` (comma-separated logger prefixes to spotlight, e.g. `httpcore,telegram`)
 - `TELECLAUDE_MUTED_LOGGERS` (comma-separated logger prefixes to force to WARNING+, e.g. `teleclaude.cli.tui`)
 
-Global:
-
-- `INSTRUKT_AI_LOG_ROOT` (optional log root override)
+These four per-app variables are the entire contract. There is no log-root
+override variable — the location is a fixed rule (see below).
 
 ## Log location (contract)
 
-Default target:
+Every app's logs live at the same predictable, prose-citable location on both
+macOS and Linux:
 
-- `/var/log/instrukt-ai/{app}/{app}.log`
+- `$XDG_STATE_HOME/instrukt-ai/{app}/{app}.log` (fallback `~/.local/state`,
+  per the XDG Base Directory spec)
 
-The installer for each service is expected to create the directory and set write permissions for the daemon user. If the default location is not writable, the implementation will fall back to a user-writable directory and/or require `INSTRUKT_AI_LOG_ROOT`.
+This path is always user-writable — no installer step, no sudo, no elevated
+permissions. `configure_logging(...)` raises immediately if the log file
+cannot be opened; logging is an essential subsystem and a process that cannot
+write its logs must not start blind.
+
+## Rotation
+
+Rotation is transparent and runs entirely in user space:
+`configure_logging(...)` idempotently ensures a per-user rotation conf plus a
+per-user scheduler (a launchd LaunchAgent on macOS running `newsyslog`, a
+systemd user timer on Linux running `logrotate`) on every process start. No
+`/etc` configuration, no sudo, and no system rotation daemon ever touches
+these files, so rotated/recreated logs always stay owned by the producing
+user. Run `instrukt-ai-log-setup` to check rotation-asset status manually;
+normal operation never requires it.
 
 ## CLI
 

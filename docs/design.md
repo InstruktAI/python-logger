@@ -15,9 +15,14 @@ Logs must remain meaningfully queryable even when a consumer (especially an AI) 
 
 ### Local-first storage; predictable path
 
-- Canonical target path is `/var/log/instrukt-ai/{app}/{app}.log`.
-- Service installers may prompt for sudo to create directories and set permissions.
-- The library must support an explicit override via `INSTRUKT_AI_LOG_ROOT`.
+- Canonical target path is `$XDG_STATE_HOME/instrukt-ai/{app}/{app}.log`
+  (fallback `~/.local/state`, per the XDG Base Directory spec), identical on
+  macOS and Linux.
+- The path is always user-writable by construction — no installer step, no
+  sudo, no elevated permissions, and no override variable.
+- `configure_logging(...)` fails fast: an unopenable log file/dir raises
+  immediately rather than degrading, since a process that cannot write its
+  logs must not start blind.
 
 ### Keep logs human-readable (text), but structured enough for machines
 
@@ -46,7 +51,11 @@ Application logs (Python logging) and service-manager/process logs (stdout/stder
 
 ## Non-negotiables
 
-- Rotation must exist (prefer OS tooling; library should not prevent external rotation).
+- Rotation must exist and run entirely as the producing user: a per-user
+  rotation conf plus a per-user scheduler (launchd LaunchAgent on macOS,
+  systemd user timer on Linux), ensured transparently and idempotently by
+  `configure_logging(...)`. No `/etc` configuration, no sudo, no system
+  rotation daemon — root never touches these files, so rotated/recreated
+  logs cannot come back root-owned.
 - No secret leakage (redaction must be part of the standard).
 - Large payloads must not dominate the tail window (truncate very long lines).
-

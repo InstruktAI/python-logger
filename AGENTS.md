@@ -11,16 +11,20 @@ Before changing anything, read `docs/design.md`.
   - `{APP}_THIRD_PARTY_LOG_LEVEL`
   - `{APP}_THIRD_PARTY_LOGGERS`
   - `{APP}_MUTED_LOGGERS`
-  - `INSTRUKT_AI_LOG_ROOT`
 - Prefer adding capabilities behind existing knobs over introducing new knobs.
 
 ## Behavioral invariants (do not break)
 
 - Logs remain tail-friendly: prevent third-party spam from pushing signal out of the tail window.
 - Output stays human-readable, single-line per event.
-- Default log destination targets `/var/log/instrukt-ai/{app}/{app}.log`.
-- Always support explicit override via `INSTRUKT_AI_LOG_ROOT`.
-- External rotation must be supported (don’t “fight” logrotate/newsyslog).
+- Default log destination targets `$XDG_STATE_HOME/instrukt-ai/{app}/{app}.log`
+  (fallback `~/.local/state`, per the XDG Base Directory spec) — one
+  predictable location, no override knob.
+- Rotation is owned by the library in user space (newsyslog/logrotate run as
+  the producing user); never reintroduce root-owned rotation or system `/etc`
+  config.
+- Logging fails fast at startup; never degrade or continue when it cannot
+  initialize.
 - Redact secrets and truncate very long lines (tail killers).
 
 ## Implementation notes (for future work)

@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.8", "pyright>=1.1", "mypy>=1.10"]
+dev = ["pytest>=8", "pytest-timeout>=2.2.0", "ruff>=0.8", "pyright>=1.1", "mypy>=1.10"]
 
 [project.scripts]
 instrukt-ai-logs = "instrukt_ai_logging.cli:main"
@@ -25,8 +25,17 @@ include = ["instrukt_ai_logging*"]
 instrukt_ai_logging = ["py.typed"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "--strict-config --strict-markers --tb=short -q"
 testpaths = ["tests"]
+timeout = 5
+timeout_method = "signal"
+session_timeout = 90
+markers = [
+    "functional: fast, hermetic, no I/O beyond tmp_path",
+    "integration: exercises multiple in-process components together, still hermetic",
+    "process: drives an external process, bounded and hermetic (tmp_path/monkeypatch-isolated)",
+    "spec: binds a feature-spec scenario",
+]
 
 [tool.ruff]
 line-length = 120
