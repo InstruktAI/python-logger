@@ -49,9 +49,23 @@ Outputs:
 - **Stdlib only at runtime.** `pyproject.toml` declares `dependencies = []`.
   Optional `dev` extras are pytest and ruff. Adding a runtime dependency would
   break this invariant.
+
+<!-- planned-change:rotation-drops-log-ownership -->
+
 - **One handler per process.** `configure_logging` replaces
   `logging.root.handlers` with a single `WatchedFileHandler`. Verified by
   `tests/test_configure_logging.py::test_configure_logging_uses_single_file_handler`.
+
+<!-- change:rotation-drops-log-ownership -->
+
+- **One handler per process.** `configure_logging` replaces
+  `logging.root.handlers` with a single handler — a `WatchedFileHandler` on the
+  resolved log file, or a `StreamHandler` to stderr when that file cannot be
+  opened. Verified by
+  `tests/test_configure_logging.py::test_configure_logging_uses_single_file_handler`.
+
+<!-- /planned-change:rotation-drops-log-ownership -->
+
 - **One line per event.** `LogfmtFormatter.format` joins parts with spaces and
   escapes embedded newlines via `_escape_quotes`. Exception text has its newlines
   replaced with `\n` before being attached as `exc=...`.
@@ -91,6 +105,8 @@ parse --since (e.g. "10m") into timedelta
 
 Rotation install flow (`instrukt-ai-log-setup`):
 
+<!-- planned-change:rotation-drops-log-ownership -->
+
 ```
 detect platform
   → macOS: enumerate every <log_root>/*/*.log file (newsyslog cannot expand
@@ -100,13 +116,46 @@ detect platform
     with size 50M, rotate 5, compress, delaycompress, missingok, copytruncate
 ```
 
+<!-- change:rotation-drops-log-ownership -->
+
+```
+detect platform
+  → resolve the producer owner:group (SUDO_USER → existing app-log-dir owner →
+    invoking user; omitted with a stderr warning when only root resolves)
+  → macOS: enumerate every <log_root>/*/*.log file (newsyslog cannot expand
+    globs at rotation time) and emit one explicit line per file with
+    "<owner>:<group>  640  5  50000  *  Z" defaults (gzip-compress 5 archives at
+    50 MB), so root-run newsyslog recreates the rotated file owned by the producer
+  → Linux: write a single logrotate block for "<log_root>/*/*.log" with size 50M,
+    rotate 5, compress, delaycompress, missingok, copytruncate, plus
+    "su <user> <group>" when a non-root owner resolves
+```
+
+<!-- /planned-change:rotation-drops-log-ownership -->
+
 ## Failure modes
+
+<!-- planned-change:rotation-drops-log-ownership -->
 
 - **Missing log root permission.** `_ensure_log_dir` calls `mkdir(parents=True,
 exist_ok=True)` — if `/var/log/instrukt-ai/` is not writable, this raises.
   The contract relies on each service's installer creating the directory and
   granting the daemon user write access; `INSTRUKT_AI_LOG_ROOT` is the documented
   override for dev or unprivileged contexts.
+
+<!-- change:rotation-drops-log-ownership -->
+
+- **Missing log root permission.** `configure_logging` wraps log-dir creation and
+  `WatchedFileHandler` construction; an `OSError` (e.g. a root-owned, unwritable
+  log file after rotation) does not crash the host process. It attaches a stderr
+  `StreamHandler` fallback carrying the same formatter and filter, emits a
+  degraded-mode warning naming the path, and still returns the resolved log-file
+  path. The contract relies on each service's installer creating the directory and
+  granting the daemon user write access; `INSTRUKT_AI_LOG_ROOT` is the documented
+  override for dev or unprivileged contexts.
+
+<!-- /planned-change:rotation-drops-log-ownership -->
+
 - **Empty/malformed timestamps in merged read.** `parse_log_timestamp` returns
   `None` for unparseable lines; `iter_recent_log_lines_merged` treats those as
   continuation lines and inherits the previous parsed timestamp from the same
@@ -117,6 +166,19 @@ exist_ok=True)` — if `/var/log/instrukt-ai/` is not writable, this raises.
   at install time. A new `<source>.log` created later is not rotated until
   `instrukt-ai-log-setup --force` is re-run. This is documented in the install
   module docstring and is intentional given newsyslog's lack of glob expansion.
+
+<!-- planned:rotation-drops-log-ownership -->
+
+- **Rotation ownership.** macOS newsyslog runs as root under launchd; without an
+  `owner:group` field it recreates the rotated file root-owned, which the non-root
+  producer can no longer open. `_install_newsyslog` bakes the producer's
+  `owner:group` into each line (resolved from `SUDO_USER`, else the existing app
+  log directory's owner, else the invoking user), so rotation preserves ownership.
+  When only root resolves, the field is omitted and a stderr warning tells the
+  operator to re-run under the producer account.
+
+<!-- /planned:rotation-drops-log-ownership -->
+
 - **Large/sensitive payloads.** Mitigated by `_truncate_text` and
   `_REDACTION_PATTERNS`. Adding new redactions requires "strong justification"
   per the inline comment — they execute on every log line.
