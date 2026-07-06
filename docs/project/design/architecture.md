@@ -50,22 +50,9 @@ Outputs:
   Optional `dev` extras are pytest and ruff. Adding a runtime dependency would
   break this invariant.
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
 - **One handler per process.** `configure_logging` replaces
   `logging.root.handlers` with a single `WatchedFileHandler`. Verified by
   `tests/test_configure_logging.py::test_configure_logging_uses_single_file_handler`.
-
-<!-- change:rotation-drops-log-ownership -->
-
-- **One handler per process.** `configure_logging` replaces
-  `logging.root.handlers` with a single handler — a `WatchedFileHandler` on the
-  resolved log file, or a `StreamHandler` to stderr when that file cannot be
-  opened. Verified by
-  `tests/test_configure_logging.py::test_configure_logging_uses_single_file_handler`.
-
-<!-- /planned-change:rotation-drops-log-ownership -->
-
 - **One line per event.** `LogfmtFormatter.format` joins parts with spaces and
   escapes embedded newlines via `_escape_quotes`. Exception text has its newlines
   replaced with `\n` before being attached as `exc=...`.
@@ -135,27 +122,14 @@ detect platform
 
 ## Failure modes
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
 - **Missing log root permission.** `_ensure_log_dir` calls `mkdir(parents=True,
-exist_ok=True)` — if `/var/log/instrukt-ai/` is not writable, this raises.
-  The contract relies on each service's installer creating the directory and
-  granting the daemon user write access; `INSTRUKT_AI_LOG_ROOT` is the documented
-  override for dev or unprivileged contexts.
-
-<!-- change:rotation-drops-log-ownership -->
-
-- **Missing log root permission.** `configure_logging` wraps log-dir creation and
-  `WatchedFileHandler` construction; an `OSError` (e.g. a root-owned, unwritable
-  log file after rotation) does not crash the host process. It attaches a stderr
-  `StreamHandler` fallback carrying the same formatter and filter, emits a
-  degraded-mode warning naming the path, and still returns the resolved log-file
-  path. The contract relies on each service's installer creating the directory and
-  granting the daemon user write access; `INSTRUKT_AI_LOG_ROOT` is the documented
-  override for dev or unprivileged contexts.
-
-<!-- /planned-change:rotation-drops-log-ownership -->
-
+exist_ok=True)` — if `/var/log/instrukt-ai/` is not writable this raises, and
+  `configure_logging` likewise raises if the resolved log file cannot be opened.
+  This hard failure is intentional: logging is an essential subsystem and must
+  fail fast at startup rather than degrade silently. The contract relies on each
+  service's installer creating the directory and granting the daemon user write
+  access; `INSTRUKT_AI_LOG_ROOT` is the documented override for dev or
+  unprivileged contexts.
 - **Empty/malformed timestamps in merged read.** `parse_log_timestamp` returns
   `None` for unparseable lines; `iter_recent_log_lines_merged` treats those as
   continuation lines and inherits the previous parsed timestamp from the same
