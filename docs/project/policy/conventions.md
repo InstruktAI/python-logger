@@ -43,10 +43,26 @@ generated_at: "2026-05-06T23:30:00Z"
   `<UTC ms timestamp> level=... logger=... msg="..." [<sorted **kv pairs>] [exc=...]`.
   Do not introduce JSON-first formatting unless a consumer explicitly requires it
   (per `docs/design.md`).
+
+<!-- planned-change:rotation-drops-log-ownership -->
+
 - **Env-var contract is stable:** `{APP}_LOG_LEVEL`,
   `{APP}_THIRD_PARTY_LOG_LEVEL`, `{APP}_THIRD_PARTY_LOGGERS`,
   `{APP}_MUTED_LOGGERS`, plus global `INSTRUKT_AI_LOG_ROOT`. Add capability
   behind existing knobs before introducing a new env var (per `AGENTS.md`).
+
+<!-- change:rotation-drops-log-ownership -->
+
+- **Env-var contract is stable:** `{APP}_LOG_LEVEL`,
+  `{APP}_THIRD_PARTY_LOG_LEVEL`, `{APP}_THIRD_PARTY_LOGGERS`,
+  `{APP}_MUTED_LOGGERS` — these four per-app variables are the entire
+  contract. The log location is a fixed rule
+  (`$XDG_STATE_HOME/instrukt-ai/{app}/`, fallback `~/.local/state`), not an
+  env knob; no override variable exists. Add capability behind existing knobs
+  before introducing a new env var (per `AGENTS.md`).
+
+<!-- /planned-change:rotation-drops-log-ownership -->
+
 - **Commits and CI:** Pre-commit hooks (`.pre-commit-config.yaml`) run
   `telec code lint` and `telec code test` plus a guard against hardcoded
   `/Users/...` or `/home/...` paths in markdown.
