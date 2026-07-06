@@ -92,8 +92,6 @@ parse --since (e.g. "10m") into timedelta
 
 Rotation install flow (`instrukt-ai-log-setup`):
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
 ```
 detect platform
   → macOS: enumerate every <log_root>/*/*.log file (newsyslog cannot expand
@@ -102,25 +100,6 @@ detect platform
   → Linux: write a single logrotate block for "<log_root>/*/*.log"
     with size 50M, rotate 5, compress, delaycompress, missingok, copytruncate
 ```
-
-<!-- change:rotation-drops-log-ownership -->
-
-```
-detect platform
-  → resolve each file's producer owner:group from its app-log-dir owner →
-    SUDO_USER → invoking user (the existing app-dir owner wins, so a --force rerun
-    by a different admin preserves the producer; omitted with a stderr warning
-    when only root resolves)
-  → macOS: enumerate every <log_root>/*/*.log file (newsyslog cannot expand
-    globs at rotation time) and emit one explicit line per file with
-    "<owner>:<group>  640  5  50000  *  Z" defaults (gzip-compress 5 archives at
-    50 MB), so root-run newsyslog recreates the rotated file owned by the producer
-  → Linux: write a single logrotate block for "<log_root>/*/*.log" with size 50M,
-    rotate 5, compress, delaycompress, missingok, copytruncate, plus
-    "su <user> <group>" when a non-root owner resolves
-```
-
-<!-- /planned-change:rotation-drops-log-ownership -->
 
 ## Failure modes
 
@@ -142,19 +121,6 @@ exist_ok=True)` — if `/var/log/instrukt-ai/` is not writable this raises, and
   at install time. A new `<source>.log` created later is not rotated until
   `instrukt-ai-log-setup --force` is re-run. This is documented in the install
   module docstring and is intentional given newsyslog's lack of glob expansion.
-
-<!-- planned:rotation-drops-log-ownership -->
-
-- **Rotation ownership.** macOS newsyslog runs as root under launchd; without an
-  `owner:group` field it recreates the rotated file root-owned, which the non-root
-  producer can no longer open. `_install_newsyslog` bakes the producer's
-  `owner:group` into each line (resolved per file from the existing app log
-  directory's owner, else `SUDO_USER`, else the invoking user — the established
-  producer owner wins over the account running a `--force` rerun), so rotation
-  preserves ownership. When only root resolves, the field is omitted and a stderr
-  warning tells the operator to re-run under the producer account.
-
-<!-- /planned:rotation-drops-log-ownership -->
 
 - **Large/sensitive payloads.** Mitigated by `_truncate_text` and
   `_REDACTION_PATTERNS`. Adding new redactions requires "strong justification"
