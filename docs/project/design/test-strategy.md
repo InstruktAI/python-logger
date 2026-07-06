@@ -39,11 +39,10 @@ Inputs:
 
 - `test_install.py` — user-space rotation assets: conf/scheduler-unit
   emission and idempotent ensure, driven through `configure_logging` and the
-  `instrukt-ai-log-setup` entry surface with only the scheduler subprocess
-  boundary faked.
-- `test_rotation.py` — end-to-end rotation through the real platform rotator
-  (`newsyslog -f` on macOS, `logrotate` on Linux, platform-gated) asserting
-  archives appear and recreated files keep the invoking user's ownership.
+  `instrukt-ai-log-setup` entry surface with the scheduler subprocess boundary
+  always faked. No test in this repository executes a real subprocess:
+  third-party rotator/scheduler behavior (newsyslog, logrotate, launchctl,
+  systemctl) is out of test scope — only this library's own logic is tested.
 
 <!-- /planned-change:rotation-drops-log-ownership -->
 
@@ -77,6 +76,22 @@ Outputs:
 
 - **Quiet output.** `pyproject.toml` sets `addopts = "-q"` and
   `testpaths = ["tests"]`.
+
+<!-- planned:rotation-drops-log-ownership -->
+
+- **Non-negotiable time budgets.** `pytest-timeout` enforces a 5-second
+  per-test signal timeout and a 90-second session timeout via
+  `[tool.pytest.ini_options]` (`timeout=5`, `timeout_method="signal"`,
+  `session_timeout=90`, `--strict-config --strict-markers`). The whole suite
+  completes in seconds. A hanging or over-budget test is a defect to fix —
+  split, rewrite, or remove — never a reason to wait or raise the budget.
+- **Fully hermetic.** An autouse `tests/conftest.py` fixture fakes the
+  scheduler subprocess seam suite-wide and isolates `HOME` and
+  `XDG_STATE_HOME` to `tmp_path`; no test touches the real user domain
+  (`~/Library/LaunchAgents`, `~/.config`, `~/.local/state`) or any real
+  binary.
+
+<!-- /planned:rotation-drops-log-ownership -->
 
 ## Primary flows
 
