@@ -30,21 +30,12 @@ Inputs:
   - `test_cli_follow.py` — `iter_follow_lines` reads only appended lines after
     `start_at_end=True`.
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
-- `test_install.py` — newsyslog and logrotate config generation, overwrite
-  refusal, compression defaults.
-
-<!-- change:rotation-drops-log-ownership -->
-
 - `test_install.py` — user-space rotation assets: conf/scheduler-unit
   emission and idempotent ensure, driven through `configure_logging` and the
   `instrukt-ai-log-setup` entry surface with the scheduler subprocess boundary
   always faked. No test in this repository executes a real subprocess:
   third-party rotator/scheduler behavior (newsyslog, logrotate, launchctl,
   systemctl) is out of test scope — only this library's own logic is tested.
-
-<!-- /planned-change:rotation-drops-log-ownership -->
 
 Outputs:
 
@@ -61,23 +52,12 @@ Outputs:
   - The `isolated_logging` fixture in `test_configure_logging.py` that snapshots
     and restores `logging.root.handlers` and `logging.root.level`.
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
-- Per-test `TemporaryDirectory()` plus `monkeypatch.setenv("INSTRUKT_AI_LOG_ROOT", tmp)`
-  so no test writes to `/var/log/instrukt-ai/`.
-
-<!-- change:rotation-drops-log-ownership -->
-
 - Per-test `TemporaryDirectory()` plus `monkeypatch.setenv("XDG_STATE_HOME", tmp)`
   — the platform's own XDG mechanism — so no test writes to the user's real
   `~/.local/state/instrukt-ai/` tree.
 
-<!-- /planned-change:rotation-drops-log-ownership -->
-
 - **Quiet output.** `pyproject.toml` sets `addopts = "-q"` and
   `testpaths = ["tests"]`.
-
-<!-- planned:rotation-drops-log-ownership -->
 
 - **Non-negotiable time budgets.** `pytest-timeout` enforces a 5-second
   per-test signal timeout and a 90-second session timeout via
@@ -91,31 +71,9 @@ Outputs:
   (`~/Library/LaunchAgents`, `~/.config`, `~/.local/state`) or any real
   binary.
 
-<!-- /planned:rotation-drops-log-ownership -->
-
 ## Primary flows
 
 Standard test setup:
-
-<!-- planned-change:rotation-drops-log-ownership -->
-
-```
-fixture creates TemporaryDirectory + monkeypatch.setenv(INSTRUKT_AI_LOG_ROOT)
-  → call configure_logging("teleclaude") (or get_logger())
-  → emit log records via standard logging.getLogger(...).info(...)
-  → read the resulting file with _read_text(path)
-  → assert on substrings (e.g. 'logger=teleclaude.core', 'msg="..."')
-```
-
-Install-test setup:
-
-```
-fixture creates tmp_path with synthetic log_root/*/*.log files
-  → call _install_newsyslog/_install_logrotate(log_root, force=..., conf_path=...)
-  → read conf_path and assert on emitted lines or directives
-```
-
-<!-- change:rotation-drops-log-ownership -->
 
 ```
 fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME, tmp)
@@ -135,8 +93,6 @@ fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME/HOME, tmp
   → assert on protocol-significant tokens, idempotence across a second run,
     warning lines in the log file, and exit status
 ```
-
-<!-- /planned-change:rotation-drops-log-ownership -->
 
 CLI follow test:
 

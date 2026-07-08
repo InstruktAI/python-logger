@@ -2,7 +2,7 @@
 id: "project/spec/configuration"
 type: "spec"
 scope: "project"
-description: "Runtime configuration contract for instrukt_ai_logging: per-app environment variables and the global INSTRUKT_AI_LOG_ROOT override."
+description: "Runtime configuration contract for instrukt_ai_logging: four per-app environment variables and one fixed, predictable log location — no global override."
 generated_by: "telec-init"
 generated_at: "2026-05-06T23:30:00Z"
 ---
@@ -14,7 +14,8 @@ generated_at: "2026-05-06T23:30:00Z"
 The full runtime configuration surface of the library. There are no config
 files — every knob is an environment variable. Per-app variables are namespaced
 by an `{APP}` prefix derived from the `name` argument passed to
-`configure_logging(...)`. One global variable controls the log root.
+`configure_logging(...)`. The log location is a fixed rule, not a knob: there
+is no global override variable.
 
 ## Canonical fields
 
@@ -36,10 +37,9 @@ e.g. `TELECLAUDE` for `configure_logging("teleclaude")`):
   Applies to both app and third-party prefixes; use it to silence noisy
   sub-namespaces (e.g. `teleclaude.cli.tui`).
 
-Global environment variables:
-
-- `INSTRUKT_AI_LOG_ROOT` — base directory under which `<app>/<source>.log`
-  files live. When unset, defaults to `/var/log/instrukt-ai`.
+These four variables are the entire environment contract. The library
+additionally _honors_ `XDG_STATE_HOME` because the log location follows the XDG
+Base Directory spec — that is platform compliance, not an app knob.
 
 In-process configuration (`configure_logging(...)` keyword args):
 
@@ -50,9 +50,11 @@ In-process configuration (`configure_logging(...)` keyword args):
 - `max_message_chars: int = 4000` — per-record truncation budget; values longer
   than this are suffixed with `…(truncated)`.
 
-Resolved log file path:
+Resolved log file path (identical on macOS and Linux):
 
-- `<INSTRUKT_AI_LOG_ROOT or /var/log/instrukt-ai>/<app>/<source-or-app>.log`
+- `$XDG_STATE_HOME/instrukt-ai/<app>/<source-or-app>.log`
+  (`$XDG_STATE_HOME` falls back to `~/.local/state` when unset, per the XDG
+  Base Directory spec)
 
 ## Allowed values
 
@@ -63,7 +65,6 @@ Resolved log file path:
 - Level names are case-insensitive; unrecognized names fall back to the
   function-level default (`INFO` for app, `WARNING` for third-party) via
   `_level_name_to_int`.
-- `INSTRUKT_AI_LOG_ROOT` is `expanduser`-ed, so `~/logs` works for dev.
 
 ## Known caveats
 
@@ -73,6 +74,7 @@ Resolved log file path:
   entries that overlap the app prefix are skipped to avoid clobbering it.
 - `{APP}_MUTED_LOGGERS` runs after spotlight assignment, so muting takes
   precedence over spotlighting for the same prefix.
-- The default `/var/log/instrukt-ai/<app>/` typically requires the service's
-  installer to create the directory and grant the daemon user write access.
-  In dev or CI, set `INSTRUKT_AI_LOG_ROOT` to a writable temp directory.
+- The log root is user-writable by construction; no installer step or elevated
+  permissions are involved. Tests and CI isolate the filesystem by setting
+  `XDG_STATE_HOME` to a temporary directory — the platform's own mechanism,
+  not an app-specific hook.

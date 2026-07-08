@@ -25,22 +25,11 @@ Console scripts (from `[project.scripts]`):
   `--grep`), time window (`--since`), per-source stem selection
   (`--logs`, alias `--include`), and `tail -f`-style follow (`-f` / `--follow`).
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
-- `instrukt-ai-log-setup = "instrukt_ai_logging.install:main"` — write
-  platform-appropriate rotation config: newsyslog on macOS
-  (`/etc/newsyslog.d/instrukt-ai.conf`), logrotate on Linux
-  (`/etc/logrotate.d/instrukt-ai`).
-
-<!-- change:rotation-drops-log-ownership -->
-
 - `instrukt-ai-log-setup = "instrukt_ai_logging.install:main"` — run the same
   idempotent rotation-asset ensure step that `configure_logging` performs
   transparently, and print a status report (resolved log root, conf paths,
   scheduler state). User-space only; requires no sudo. Useful for debugging —
   normal operation never needs it.
-
-<!-- /planned-change:rotation-drops-log-ownership -->
 
 Python package API (`instrukt_ai_logging/__init__.py::__all__`):
 
@@ -76,16 +65,8 @@ CLI argument surfaces:
 
 - `instrukt-ai-logs <app> [--since 10m] [--follow] [--grep PATTERN] [--exclude PATTERN] [--logs/--include stem1,stem2] [--version]`
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
-- `instrukt-ai-log-setup [--log-root PATH] [--force]`
-
-<!-- change:rotation-drops-log-ownership -->
-
 - `instrukt-ai-log-setup` (no arguments — the log root is the fixed
   `$XDG_STATE_HOME/instrukt-ai` rule and the ensure step is idempotent)
-
-<!-- /planned-change:rotation-drops-log-ownership -->
 
 ## Allowed values
 
@@ -104,18 +85,9 @@ CLI argument surfaces:
 - `configure_logging` replaces (does not extend) `logging.root.handlers`. Code
   that pre-attaches handlers will lose them.
 
-<!-- planned-change:rotation-drops-log-ownership -->
-
-- `instrukt-ai-log-setup` writes to system paths and typically requires sudo;
-  use `--log-root <writable-dir>` to dry-run into a user directory.
-
-<!-- change:rotation-drops-log-ownership -->
-
 - `instrukt-ai-log-setup` is optional: `configure_logging(...)` already ensures
   the rotation assets on every process start. The command exists to run that
   ensure step manually and inspect its status.
-
-<!-- /planned-change:rotation-drops-log-ownership -->
 
 - The `__version__` resolution catches a bare `Exception` and falls back to
   `"0.0.0"` when the package is loaded outside an installed distribution.
