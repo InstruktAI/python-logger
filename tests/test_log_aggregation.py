@@ -56,11 +56,11 @@ def test_resolve_log_files_default_returns_all_log_files(app_log_dir: Path) -> N
     _write(app_log_dir / "cron.log", "")
     _write(app_log_dir / "docs-watch.log", "")
     _write(app_log_dir / "demo-app.log.1", "")
-    _write(app_log_dir / "demo-app.log.2.gz", "")  # excluded
+    _write(app_log_dir / "demo-app.log.2.gz", "")
 
     result = resolve_log_files("demo-app")
     names = sorted(p.name for p in result)
-    assert names == ["cron.log", "demo-app.log", "demo-app.log.1", "docs-watch.log"]
+    assert names == ["cron.log", "demo-app.log", "demo-app.log.1", "demo-app.log.2.gz", "docs-watch.log"]
 
 
 def test_resolve_log_files_with_stems_filters_to_matching_files(app_log_dir: Path) -> None:

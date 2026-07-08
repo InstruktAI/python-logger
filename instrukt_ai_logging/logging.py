@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import heapq
 import logging
 import os
@@ -378,7 +379,7 @@ def resolve_log_files(app_name: str, *, stems: Iterable[str] | None = None) -> l
     """Resolve all log files for `app_name`, optionally filtered by stem.
 
     Returns every `<something>.log[.suffix]` file in the app's log directory,
-    excluding compressed rotation siblings (`.gz`). When `stems` is provided,
+    including compressed rotation siblings (`.gz`). When `stems` is provided,
     only files whose stem (basename before the first `.log`) matches an entry
     are returned. Files are deduplicated and sorted by path.
 
@@ -403,8 +404,6 @@ def resolve_log_files(app_name: str, *, stems: Iterable[str] | None = None) -> l
         if path in seen:
             continue
         if not path.is_file():
-            continue
-        if path.name.endswith(".gz"):
             continue
         seen.add(path)
         result.append(path)
@@ -613,12 +612,14 @@ def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Ite
     cutoff = _now_utc() - since
 
     def _file_stream(path: Path) -> Iterator[tuple[datetime, str]]:
+        is_gzip = path.name.endswith(".gz")
         try:
-            fb = path.open("rb")
+            fb = gzip.open(path, "rb") if is_gzip else path.open("rb")
         except FileNotFoundError:
             return
         try:
-            offset = _window_start_offset(path, cutoff)
+            # Gzip streams cannot use the raw byte probe; stream eligible archives from member start.
+            offset = 0 if is_gzip else _window_start_offset(path, cutoff)
             if offset:
                 fb.seek(offset)
                 fb.readline()  # discard the partial line at the seek boundary
