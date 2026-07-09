@@ -44,20 +44,9 @@ Python package API (`instrukt_ai_logging/__init__.py::__all__`):
   same surface for type-only contexts.
 - `resolve_log_file(app_name, *, source=None) -> Path` — canonical path
   builder.
-
-<!-- planned-change:fix-instrukt-ai-logs-since-silently-omits-ro -->
-
-- `resolve_log_files(app_name, *, stems=None) -> list[Path]` — enumerate the
-  app's log files, optionally filtered by exact stem, excluding `.gz` siblings.
-
-<!-- change:fix-instrukt-ai-logs-since-silently-omits-ro -->
-
 - `resolve_log_files(app_name, *, stems=None) -> list[Path]` — enumerate the
   app's log files, optionally filtered by exact stem, including rotated `.gz`
   archives so `--since` time-window reads span compressed rotation history.
-
-<!-- /planned-change:fix-instrukt-ai-logs-since-silently-omits-ro -->
-
 - `TRACE` — integer level value `5`, registered with `logging.addLevelName`
   and assigned as `logging.TRACE` for downstream introspection.
 

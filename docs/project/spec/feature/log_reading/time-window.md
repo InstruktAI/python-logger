@@ -3,7 +3,6 @@ id: "project/spec/feature/log_reading/time-window"
 type: "spec"
 scope: "project"
 description: "Feature: instrukt-ai-logs --since time-window retrieval returns in-window lines merged across the live segment and its rotated archives, including gzip-compressed ones."
-delivered_by: ["fix-instrukt-ai-logs-since-silently-omits-ro"]
 ---
 
 # Time-Window Log Retrieval — Spec
@@ -25,8 +24,6 @@ scales with the window, not with rotation depth.
 
 ### Use cases
 
-<!-- planned:fix-instrukt-ai-logs-since-silently-omits-ro -->
-
 #### UC-TW1: --since returns in-window lines from a rotated, gzipped archive
 
 ```gherkin
@@ -40,5 +37,3 @@ Then the in-window line from the gzipped archive appears in the output
 And it is ordered by timestamp among the lines read from the live segment
 And no line from the wholly-older archive appears in the output
 ```
-
-<!-- /planned:fix-instrukt-ai-logs-since-silently-omits-ro -->
