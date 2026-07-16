@@ -3,8 +3,6 @@ id: "project/spec/configuration"
 type: "spec"
 scope: "project"
 description: "Runtime configuration contract for instrukt_ai_logging: four per-app environment variables and one fixed, predictable log location — no global override."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Configuration — Spec

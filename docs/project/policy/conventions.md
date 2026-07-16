@@ -3,8 +3,6 @@ id: "project/policy/conventions"
 type: "policy"
 scope: "project"
 description: "Code conventions observed in instrukt_ai_logging: snake_case Python with type hints, ruff formatting at line-length 120, future annotations, stdlib-only runtime."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Project Conventions — Policy

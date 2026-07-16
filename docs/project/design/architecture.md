@@ -3,8 +3,6 @@ id: "project/design/architecture"
 type: "design"
 scope: "project"
 description: "Architecture of the instrukt_ai_logging library: a stdlib-only Python package whose logging and rotation both live entirely in user space — one predictable XDG log location, rotation run as the producing user, zero root involvement."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Project Architecture — Design

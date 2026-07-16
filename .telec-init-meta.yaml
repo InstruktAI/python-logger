@@ -1,5 +1,4 @@
-last_analyzed_at: "2026-05-06T23:30:00Z"
-analyzed_by: telec-init
+last_analyzed_commit: "da08b8679391e5e2b4c94936c1403196ef39290b"
 files_analyzed: 16
 snippets_generated:
   - project/design/architecture

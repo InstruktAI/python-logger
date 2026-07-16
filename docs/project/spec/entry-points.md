@@ -3,8 +3,6 @@ id: "project/spec/entry-points"
 type: "spec"
 scope: "project"
 description: "Entry points exposed by instrukt_ai_logging: two console scripts (instrukt-ai-logs, instrukt-ai-log-setup) and a Python API re-exported from the package root."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Entry Points — Spec

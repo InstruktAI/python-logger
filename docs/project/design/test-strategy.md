@@ -3,8 +3,6 @@ id: "project/design/test-strategy"
 type: "design"
 scope: "project"
 description: "Test invariants for instrukt_ai_logging: hermeticity, isolation, time budgets, one module per concern. Constraints on future tests — the suite itself is its own documentation."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Test Strategy — Design
