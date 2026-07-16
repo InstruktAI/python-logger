@@ -49,10 +49,24 @@ Outputs:
   `$XDG_STATE_HOME` follows the XDG Base Directory spec (fallback
   `~/.local/state` when unset) on **both** macOS and Linux.
 - `configure_logging(...)` returns the resolved log file `Path`.
+
+<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - User-space rotation assets, ensured transparently and idempotently at
   configure time: a rotation conf under `~/.config/instrukt-ai/` plus a
   per-user scheduler unit (launchd LaunchAgent on macOS, systemd user timer on
   Linux) that runs the platform rotator **as the user**.
+
+<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
+- User-space rotation assets, wired once and idempotently by the explicit
+  runtime-install entry (`instrukt-ai-log-setup`, wrapped by
+  `make install-runtime`): a rotation conf under `~/.config/instrukt-ai/` plus
+  a per-user scheduler unit (launchd LaunchAgent on macOS, systemd user timer
+  on Linux) that runs the platform rotator **as the user**.
+
+<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - `instrukt-ai-logs` CLI prints filtered/merged lines from a chosen time window;
   `instrukt-ai-log-setup` runs the same ensure step manually and reports
   rotation-asset status (no sudo; useful for debugging).
@@ -93,6 +107,8 @@ Outputs:
 
 Configuration (called once at process start):
 
+<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 ```
 caller passes name="teleclaude"
   → normalize into env_prefix / logger_prefix / app_name
@@ -123,6 +139,43 @@ derive desired conf + scheduler-unit content from the resolved log root
     configure_logging continues — rotation bootstrap is not logging
 ```
 
+<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
+```
+caller passes name="teleclaude"
+  → normalize into env_prefix / logger_prefix / app_name
+  → coerce all existing loggers to InstruktAILogger (so .info(msg, **kv) works)
+  → read env vars; compute our_level, third_party_level, spotlight, muted
+  → resolve $XDG_STATE_HOME/instrukt-ai/{app}/, ensure dir, attach single
+    WatchedFileHandler with LogfmtFormatter (any OSError raises — fail fast)
+  → set per-prefix levels for app, spotlight, muted
+  → return resolved Path
+```
+
+`configure_logging` never touches the rotation scheduler: no plist/conf writes,
+no `launchctl`/`systemctl` subprocess, on any call.
+
+Rotation-ensure flow (`instrukt-ai-log-setup`, run once at deploy — directly or
+via `make install-runtime`):
+
+```
+derive desired conf + scheduler-unit content from the resolved log root
+  → compare with what is on disk; rewrite only on drift (idempotent re-runs)
+  → macOS: ~/.config/instrukt-ai/newsyslog.conf (one glob line
+    "<root>/*/*.log 640 5 50000 * ZG": 5 gzipped archives at 50 MB) +
+    ~/Library/LaunchAgents/ai.instrukt.log-rotate.plist running
+    /usr/sbin/newsyslog -f <conf> every 30 min; bootstrap via launchctl
+  → Linux: ~/.config/instrukt-ai/logrotate.conf (size 50M, rotate 5, compress,
+    delaycompress, missingok, notifempty) + systemd user service+timer running
+    logrotate --state $XDG_STATE_HOME/instrukt-ai/logrotate.state <conf>;
+    enable via systemctl --user
+  → re-runs on an already-wired machine report healthy (idempotent — including
+    macOS launchd's EIO already-loaded bootstrap signal); problems are reported
+    in the command's status output
+```
+
+<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 Read flow (`instrukt-ai-logs <app>`):
 
 ```
@@ -141,10 +194,24 @@ parse --since (e.g. "10m") into timedelta
   essential subsystem and a process that cannot write durable logs must not
   run. Because path, writer, and rotator all live in user space, this only
   occurs on genuine local misconfiguration.
+
+<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - **Rotation-ensure failure.** `launchctl`/`systemctl` unavailable or refusing
   (e.g. no user service manager in a container): a WARNING is logged, logging
   itself continues, and log growth is unbounded until the operator resolves
   it — surfaced, never silent, never fatal.
+
+<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
+- **Rotation-ensure failure.** `launchctl`/`systemctl` unavailable or refusing
+  (e.g. no user service manager in a container): `instrukt-ai-log-setup`
+  reports the problem in its status output; logging itself is unaffected, and
+  log growth is unbounded until the operator resolves it — surfaced at
+  install-runtime, never silent, never fatal to the producing process.
+
+<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - **New producers/apps.** The rotation conf covers the log root with a glob
   evaluated at rotation time (newsyslog `G` flag / logrotate glob), so new
   `{app}`/`{source}` files are rotated without any re-install step.
