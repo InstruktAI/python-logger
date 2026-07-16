@@ -30,12 +30,25 @@ Inputs:
   - `test_cli_follow.py` — `iter_follow_lines` reads only appended lines after
     `start_at_end=True`.
 
+<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - `test_install.py` — user-space rotation assets: conf/scheduler-unit
   emission and idempotent ensure, driven through `configure_logging` and the
   `instrukt-ai-log-setup` entry surface with the scheduler subprocess boundary
   always faked. No test in this repository executes a real subprocess:
   third-party rotator/scheduler behavior (newsyslog, logrotate, launchctl,
   systemctl) is out of test scope — only this library's own logic is tested.
+
+<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
+- `test_install.py` — user-space rotation assets: conf/scheduler-unit
+  emission and idempotent ensure, driven through the `instrukt-ai-log-setup`
+  entry surface (`install.main()`) with the scheduler subprocess boundary
+  always faked. No test in this repository executes a real subprocess:
+  third-party rotator/scheduler behavior (newsyslog, logrotate, launchctl,
+  systemctl) is out of test scope — only this library's own logic is tested.
+
+<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
 Outputs:
 
@@ -85,6 +98,8 @@ fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME, tmp)
 
 Rotation-asset test setup (scheduler subprocess boundary faked, files real):
 
+<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 ```
 fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME/HOME, tmp)
   + monkeypatch of the scheduler subprocess boundary (launchctl/systemctl)
@@ -93,6 +108,19 @@ fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME/HOME, tmp
   → assert on protocol-significant tokens, idempotence across a second run,
     warning lines in the log file, and exit status
 ```
+
+<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
+```
+fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME/HOME, tmp)
+  + monkeypatch of the scheduler subprocess boundary (launchctl/systemctl)
+  → drive instrukt-ai-log-setup main()
+  → read the emitted conf / scheduler-unit files under the tmp user dirs
+  → assert on protocol-significant tokens, idempotence across a second run,
+    and exit status
+```
+
+<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
 CLI follow test:
 
