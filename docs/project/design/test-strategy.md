@@ -42,11 +42,13 @@ Inputs:
 <!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
 - `test_install.py` — user-space rotation assets: conf/scheduler-unit
-  emission and idempotent ensure, driven through the `instrukt-ai-log-setup`
-  entry surface (`install.main()`) with the scheduler subprocess boundary
-  always faked. No test in this repository executes a real subprocess:
-  third-party rotator/scheduler behavior (newsyslog, logrotate, launchctl,
-  systemctl) is out of test scope — only this library's own logic is tested.
+  emission and idempotent ensure. Setup-status behavior (healthy vs problem
+  exit) is driven through the `instrukt-ai-log-setup` entry surface
+  (`install.main()`); asset-emission checks may drive `ensure_rotation()`
+  directly. The scheduler subprocess boundary is always faked. No test in
+  this repository executes a real subprocess: third-party rotator/scheduler
+  behavior (newsyslog, logrotate, launchctl, systemctl) is out of test
+  scope — only this library's own logic is tested.
 
 <!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
@@ -114,7 +116,8 @@ fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME/HOME, tmp
 ```
 fixture creates TemporaryDirectory + monkeypatch.setenv(XDG_STATE_HOME/HOME, tmp)
   + monkeypatch of the scheduler subprocess boundary (launchctl/systemctl)
-  → drive instrukt-ai-log-setup main()
+  → drive instrukt-ai-log-setup main() (setup-status behavior) or
+    ensure_rotation() (asset-emission checks)
   → read the emitted conf / scheduler-unit files under the tmp user dirs
   → assert on protocol-significant tokens, idempotence across a second run,
     and exit status
