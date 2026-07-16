@@ -51,11 +51,27 @@ Application logs (Python logging) and service-manager/process logs (stdout/stder
 
 ## Non-negotiables
 
+<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - Rotation must exist and run entirely as the producing user: a per-user
   rotation conf plus a per-user scheduler (launchd LaunchAgent on macOS,
   systemd user timer on Linux), ensured transparently and idempotently by
   `configure_logging(...)`. No `/etc` configuration, no sudo, no system
   rotation daemon — root never touches these files, so rotated/recreated
   logs cannot come back root-owned.
+
+<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
+- Rotation must exist and run entirely as the producing user: a per-user
+  rotation conf plus a per-user scheduler (launchd LaunchAgent on macOS,
+  systemd user timer on Linux), wired once and idempotently by the explicit
+  runtime-install step (`make install-runtime` / `instrukt-ai-log-setup`) —
+  never by `configure_logging(...)`, which ensures only the log directory
+  and file. No `/etc` configuration, no sudo, no system rotation daemon —
+  root never touches these files, so rotated/recreated logs cannot come back
+  root-owned.
+
+<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
+
 - No secret leakage (redaction must be part of the standard).
 - Large payloads must not dominate the tail window (truncate very long lines).
