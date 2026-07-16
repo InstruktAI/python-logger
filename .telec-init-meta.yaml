@@ -1,11 +1,1 @@
 last_analyzed_commit: "da08b8679391e5e2b4c94936c1403196ef39290b"
-files_analyzed: 16
-snippets_generated:
-  - project/design/architecture
-  - project/design/test-strategy
-  - project/policy/conventions
-  - project/spec/dependencies
-  - project/spec/entry-points
-  - project/spec/build-deploy
-  - project/spec/configuration
-snippets_preserved: []
