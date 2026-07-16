@@ -3,8 +3,6 @@ id: "project/spec/dependencies"
 type: "spec"
 scope: "project"
 description: "Runtime and development dependencies of instruktai-python-logger. Runtime is stdlib-only by design; the dev dependency-group is pytest, ruff, pyright, and mypy."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Dependencies — Spec

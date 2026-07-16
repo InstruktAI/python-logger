@@ -3,8 +3,6 @@ id: "project/spec/build-deploy"
 type: "spec"
 scope: "project"
 description: "Build and release pipeline for instruktai-python-logger: setuptools build, AI-decided semver bump on push to main, PyPI publish on tag push."
-generated_by: "telec-init"
-generated_at: "2026-05-06T23:30:00Z"
 ---
 
 # Build and Deploy — Spec
