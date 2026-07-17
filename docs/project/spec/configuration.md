@@ -73,15 +73,6 @@ Resolved log file path (identical on macOS and Linux):
 - `{APP}_MUTED_LOGGERS` runs after spotlight assignment, so muting takes
   precedence over spotlighting for the same prefix.
 
-<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
-- The log root is user-writable by construction; no installer step or elevated
-  permissions are involved. Tests and CI isolate the filesystem by setting
-  `XDG_STATE_HOME` to a temporary directory — the platform's own mechanism,
-  not an app-specific hook.
-
-<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
 - The log root is user-writable by construction; no installer step or elevated
   permissions are involved in creating it — the first writer creates it at
   `configure_logging(...)` time. The per-user rotation scheduler is separate:
@@ -89,5 +80,3 @@ Resolved log file path (identical on macOS and Linux):
   never at `configure_logging(...)` time. Tests and CI isolate the filesystem
   by setting `XDG_STATE_HOME` to a temporary directory — the platform's own
   mechanism, not an app-specific hook.
-
-<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->

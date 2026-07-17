@@ -50,8 +50,6 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   env knob; no override variable exists. Add capability behind existing knobs
   before introducing a new env var (per `AGENTS.md`).
 
-<!-- planned:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
 - **Install split (`install` / `install-runtime`):** `make install` performs
   local development setup only (dependencies, tooling, git hooks); it never
   touches host or user machinery. Wiring the per-user rotation scheduler into
@@ -60,8 +58,6 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   invoke `instrukt-ai-log-setup` from their own deploy/setup — the console
   script, not the Make target, is the consumer-facing entry. (Mirrors the
   itsUP `install`/`install-runtime` convention at per-user granularity.)
-
-<!-- /planned:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
 - **Commits and CI:** Pre-commit hooks (`.pre-commit-config.yaml`) run
   `telec code lint` and `telec code test` plus a guard against hardcoded

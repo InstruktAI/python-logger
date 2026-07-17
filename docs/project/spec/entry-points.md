@@ -23,24 +23,12 @@ Console scripts (from `[project.scripts]`):
   `--grep`), time window (`--since`), per-source stem selection
   (`--logs`, alias `--include`), and `tail -f`-style follow (`-f` / `--follow`).
 
-<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
-- `instrukt-ai-log-setup = "instrukt_ai_logging.install:main"` — run the same
-  idempotent rotation-asset ensure step that `configure_logging` performs
-  transparently, and print a status report (resolved log root, conf paths,
-  scheduler state). User-space only; requires no sudo. Useful for debugging —
-  normal operation never needs it.
-
-<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
 - `instrukt-ai-log-setup = "instrukt_ai_logging.install:main"` — the
   runtime-install entry: idempotently wire the per-user rotation assets (conf
   plus scheduler unit) and print a status report (resolved log root, conf
   paths, scheduler state). User-space only; requires no sudo. Run once at
   deploy — directly or via `make install-runtime`; re-runs on an already-wired
   machine report healthy.
-
-<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
 Python package API (`instrukt_ai_logging/__init__.py::__all__`):
 
@@ -85,20 +73,10 @@ CLI argument surfaces:
 - `configure_logging` replaces (does not extend) `logging.root.handlers`. Code
   that pre-attaches handlers will lose them.
 
-<!-- planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
-- `instrukt-ai-log-setup` is optional: `configure_logging(...)` already ensures
-  the rotation assets on every process start. The command exists to run that
-  ensure step manually and inspect its status.
-
-<!-- change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
-
 - `configure_logging(...)` never sets up rotation. A machine that has not run
   `instrukt-ai-log-setup` (or `make install-runtime`) writes logs without a
   rotation scheduler, and log growth is unbounded until that one-time setup
   step runs.
-
-<!-- /planned-change:fix-launchd-rebootstrap-eio-spurious-rotation-warning -->
 
 - The `__version__` resolution catches a bare `Exception` and falls back to
   `"0.0.0"` when the package is loaded outside an installed distribution.
