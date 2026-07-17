@@ -12,8 +12,6 @@ from logging.handlers import WatchedFileHandler
 from pathlib import Path
 from typing import Any, Protocol, cast, runtime_checkable
 
-from instrukt_ai_logging.install import ensure_rotation
-
 # Standard logging levels are: NOTSET=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
 TRACE: int = 5
 logging.addLevelName(TRACE, "TRACE")
@@ -484,11 +482,6 @@ def configure_logging(
     # Muted loggers are forced to WARNING+ (applies to both app and third-party).
     for prefix in muted:
         logging.getLogger(prefix).setLevel(logging.WARNING)
-
-    # Rotation bootstrap is not logging: a failure here is surfaced as a
-    # warning, never fatal to an already-working log file.
-    for problem in ensure_rotation():
-        logging.getLogger(app_logger_prefix).warning("log rotation ensure problem: %s", problem)
 
     return log_file
 

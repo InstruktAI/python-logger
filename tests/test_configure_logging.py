@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger, install
+from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger
 
 # Log markers shared by each test and its assertions — named constants per
 # software-development/procedure/snapshot-testing (no bare literals in content
@@ -41,8 +41,6 @@ _FIELD_SESSION = f"session={_KV_SESSION}"
 _FIELD_N = f"n={_KV_N}"
 
 _APP_NAME = "teleclaude"
-_ROTATION_PROBLEM_MARKER = "log rotation ensure problem"
-_ROTATION_FAILURE_REASON = "no session bus"
 
 
 @pytest.fixture()
@@ -119,33 +117,6 @@ def test_configure_logging_fails_fast_when_file_unwritable(isolated_logging, mon
         finally:
             # Restore permissions so the TemporaryDirectory cleanup can unlink it.
             os.chmod(log_path, 0o644)
-
-
-class _FakeFailingCompletedProcess:
-    def __init__(self) -> None:
-        self.returncode = 1
-        self.stderr = _ROTATION_FAILURE_REASON
-        self.stdout = ""
-
-
-def test_configure_logging_warns_without_raising_when_rotation_ensure_fails(isolated_logging, monkeypatch):
-    with TemporaryDirectory() as tmp:
-        monkeypatch.setenv("XDG_STATE_HOME", tmp)
-        monkeypatch.setenv("TELECLAUDE_LOG_LEVEL", "INFO")
-        monkeypatch.setenv("TELECLAUDE_THIRD_PARTY_LOG_LEVEL", "WARNING")
-
-        def _fake_run(args):
-            return _FakeFailingCompletedProcess()
-
-        monkeypatch.setattr(install, "_run_scheduler_command", _fake_run)
-
-        # A rotation-ensure failure must never crash logging — it's surfaced
-        # as a WARNING through the configured logger, not raised.
-        log_path = configure_logging(_APP_NAME)
-
-        content = _read_text(log_path)
-        assert _ROTATION_PROBLEM_MARKER in content
-        assert _ROTATION_FAILURE_REASON in content
 
 
 def test_configure_logging_resolves_xdg_state_home_location(isolated_logging, monkeypatch):

@@ -155,9 +155,19 @@ def _ensure_launchd_loaded(plist_path: Path) -> list[str]:
     except (OSError, subprocess.TimeoutExpired) as exc:
         return [f"launchctl bootstrap failed to run: {exc}"]
 
-    if result.returncode != 0 and "already bootstrapped" not in result.stderr.lower():
+    if result.returncode == 0 or "already bootstrapped" in result.stderr.lower():
+        return []
+
+    # macOS reports EIO(5), not "already bootstrapped", when re-bootstrapping an already-loaded agent.
+    # Confirm with `print` exit status; a nonzero result preserves the original bootstrap failure.
+    try:
+        loaded_result = _run_scheduler_command(["launchctl", "print", f"gui/{uid}/{_LAUNCHD_LABEL}"])
+    except (OSError, subprocess.TimeoutExpired):
         return [f"launchctl bootstrap failed: {result.stderr.strip()}"]
-    return []
+
+    if loaded_result.returncode == 0:
+        return []
+    return [f"launchctl bootstrap failed: {result.stderr.strip()}"]
 
 
 def _ensure_systemd_loaded() -> list[str]:

@@ -1,4 +1,4 @@
-.PHONY: install lint test format
+.PHONY: install install-runtime lint test format
 
 # JS-side tools use `npx --yes` so generated projects do not depend on ambient
 # global installations when they have no frontend package declaring those tools.
@@ -20,6 +20,9 @@ install:
 		if [ -f .githooks/pre-commit ]; then cp .githooks/pre-commit "$$hook_dest"; chmod +x "$$hook_dest"; fi; \
 	'
 	@echo "✓ Project dependencies installed"
+
+install-runtime:
+	uv run instrukt-ai-log-setup
 
 lint:
 	@echo "Running native lint checks..."

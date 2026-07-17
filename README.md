@@ -21,6 +21,10 @@ From GitHub:
 pip install git+ssh://git@github.com/InstruktAI/python-logger.git
 ```
 
+For a local checkout, `make install` prepares dependencies and development
+tooling only. Run `make install-runtime` separately when this user's rotation
+scheduler should be wired.
+
 ## API
 
 - Python entrypoint: `instrukt_ai_logging.configure_logging(...)`
@@ -81,14 +85,16 @@ write its logs must not start blind.
 
 ## Rotation
 
-Rotation is transparent and runs entirely in user space:
-`configure_logging(...)` idempotently ensures a per-user rotation conf plus a
-per-user scheduler (a launchd LaunchAgent on macOS running `newsyslog`, a
-systemd user timer on Linux running `logrotate`) on every process start. No
-`/etc` configuration, no sudo, and no system rotation daemon ever touches
-these files, so rotated/recreated logs always stay owned by the producing
-user. Run `instrukt-ai-log-setup` to check rotation-asset status manually;
-normal operation never requires it.
+Rotation runs entirely in user space. At deploy, run
+`instrukt-ai-log-setup` once (or `make install-runtime` in this repository) to
+wire the per-user rotation conf plus scheduler: a launchd LaunchAgent on macOS
+running `newsyslog`, or a systemd user timer on Linux running `logrotate`.
+Re-running setup on an already-wired machine reports healthy.
+
+`configure_logging(...)` only creates and opens the log file; it never writes
+rotation assets or invokes launchd/systemd. No `/etc` configuration, no sudo,
+and no system rotation daemon ever touches these files, so rotated/recreated
+logs always stay owned by the producing user.
 
 ## CLI
 

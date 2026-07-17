@@ -48,14 +48,12 @@ def _isolate_rotation_assets(  # pyright: ignore[reportUnusedFunction]
 ) -> None:
     """Keep every test's rotation-asset writes and scheduler calls off the real machine.
 
-    `configure_logging` transparently calls `ensure_rotation()`, which writes
-    conf/scheduler files under `HOME`/`XDG_STATE_HOME`/`XDG_CONFIG_HOME` and
-    shells out to launchctl/systemctl. Autouse and unconditional — no test
-    file may rely on the ambient environment's real HOME or XDG variables,
-    and no test may reach a real scheduler/rotator binary. Tests that
-    exercise rotation directly (`test_install.py`) layer their own tighter,
-    still-tmp_path-rooted fixtures on top; a test needing the seam's failure
-    path re-fakes `_run_scheduler_command` locally.
+    Autouse and unconditional — no test file may rely on the ambient
+    environment's real HOME or XDG variables, and no test may reach a real
+    scheduler/rotator binary. The scheduler subprocess seam is faked for
+    every test. `test_install.py` layers tighter, still-tmp_path-rooted
+    fixtures on top and re-fakes `_run_scheduler_command` explicitly for its
+    failure paths.
     """
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)

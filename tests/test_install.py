@@ -223,6 +223,58 @@ def test_ensure_rotation_tolerates_already_bootstrapped_launchd(
     assert problems == []
 
 
+@pytest.mark.functional
+def test_main_treats_print_confirmed_launchd_eio_as_healthy(
+    rotation_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+
+    def _fake_run(args: list[str]) -> _FakeCompletedProcess:
+        if args[1] == "bootstrap":
+            return _FakeCompletedProcess(returncode=5, stderr="Bootstrap failed: 5: Input/output error")
+        return _FakeCompletedProcess(returncode=0)
+
+    monkeypatch.setattr(install, "_run_scheduler_command", _fake_run)
+
+    install.main()
+
+
+@pytest.mark.functional
+def test_main_reports_unconfirmed_launchd_eio(rotation_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+
+    def _fake_run(args: list[str]) -> _FakeCompletedProcess:
+        if args[1] == "bootstrap":
+            return _FakeCompletedProcess(returncode=5, stderr="Bootstrap failed: 5: Input/output error")
+        return _FakeCompletedProcess(returncode=1)
+
+    monkeypatch.setattr(install, "_run_scheduler_command", _fake_run)
+
+    with pytest.raises(SystemExit) as exc_info:
+        install.main()
+
+    assert exc_info.value.code == 1
+
+
+@pytest.mark.functional
+def test_main_reports_launchd_eio_when_discriminator_times_out(
+    rotation_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+
+    def _fake_run(args: list[str]) -> _FakeCompletedProcess:
+        if args[1] == "bootstrap":
+            return _FakeCompletedProcess(returncode=5, stderr="Bootstrap failed: 5: Input/output error")
+        raise subprocess.TimeoutExpired(cmd=args, timeout=install._SCHEDULER_COMMAND_TIMEOUT_S)
+
+    monkeypatch.setattr(install, "_run_scheduler_command", _fake_run)
+
+    with pytest.raises(SystemExit) as exc_info:
+        install.main()
+
+    assert exc_info.value.code == 1
+
+
 def test_main_prints_status_and_exits_zero_when_healthy(
     rotation_env: Path,
     successful_subprocess: list[list[str]],
