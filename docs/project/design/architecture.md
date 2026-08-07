@@ -71,6 +71,18 @@ Outputs:
 - **Rotation runs as the producing user, never root.** The scheduler unit and
   rotator invocation are per-user; rotated and recreated files therefore always
   carry the producer's ownership by construction.
+
+<!-- planned:log-retention-window-not-guaranteed -->
+
+- **Retention depth is one declaration, shared by both backends.** The archive
+  count emitted into the newsyslog `count` field and into the logrotate
+  `rotate` directive comes from a single module-level declaration, so the two
+  platforms cannot drift apart. The window it buys, and why it is bounded by
+  count rather than by age, is the contract in
+  `project/spec/feature/log_rotation/retention-window`.
+
+<!-- /planned:log-retention-window-not-guaranteed -->
+
 - **One handler per process.** `configure_logging` replaces
   `logging.root.handlers` with a single `WatchedFileHandler`. Verified by
   `tests/test_configure_logging.py::test_configure_logging_uses_single_file_handler`.
@@ -111,6 +123,8 @@ no `launchctl`/`systemctl` subprocess, on any call.
 Rotation-ensure flow (`instrukt-ai-log-setup`, run once at deploy — directly or
 via `make install-runtime`):
 
+<!-- planned-change:log-retention-window-not-guaranteed -->
+
 ```
 derive desired conf + scheduler-unit content from the resolved log root
   → compare with what is on disk; rewrite only on drift (idempotent re-runs)
@@ -126,6 +140,26 @@ derive desired conf + scheduler-unit content from the resolved log root
     macOS launchd's EIO already-loaded bootstrap signal); problems are reported
     in the command's status output
 ```
+
+<!-- change:log-retention-window-not-guaranteed -->
+
+```
+derive desired conf + scheduler-unit content from the resolved log root
+  → compare with what is on disk; rewrite only on drift (idempotent re-runs)
+  → macOS: ~/.config/instrukt-ai/newsyslog.conf (one glob line
+    "<root>/*/*.log 640 30 50000 * ZG": 30 gzipped archives at 50 MB) +
+    ~/Library/LaunchAgents/ai.instrukt.log-rotate.plist running
+    /usr/sbin/newsyslog -f <conf> every 30 min; bootstrap via launchctl
+  → Linux: ~/.config/instrukt-ai/logrotate.conf (size 50M, rotate 30, compress,
+    delaycompress, missingok, notifempty) + systemd user service+timer running
+    logrotate --state $XDG_STATE_HOME/instrukt-ai/logrotate.state <conf>;
+    enable via systemctl --user
+  → re-runs on an already-wired machine report healthy (idempotent — including
+    macOS launchd's EIO already-loaded bootstrap signal); problems are reported
+    in the command's status output
+```
+
+<!-- /planned-change:log-retention-window-not-guaranteed -->
 
 Read flow (`instrukt-ai-logs <app>`):
 
