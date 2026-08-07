@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-timeout>=2.2.0", "ruff>=0.8", "pyright>=1.1", "mypy>=1.10"]
+dev = ["pytest>=8", "pytest-timeout>=2.2.0", "ruff>=0.8", "pyright>=1.1", "mypy>=1.10", "syrupy>=4"]
 
 [project.scripts]
 instrukt-ai-logs = "instrukt_ai_logging.cli:main"

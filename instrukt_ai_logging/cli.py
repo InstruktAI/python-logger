@@ -7,10 +7,12 @@ import sys
 import threading
 import time
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 
 from instrukt_ai_logging.logging import (
     iter_recent_log_lines_merged,
+    newest_log_timestamp,
     parse_since,
     resolve_log_files,
 )
@@ -96,6 +98,18 @@ def iter_follow_lines(
                 f.close()
             except OSError:
                 pass
+
+
+_TIMESTAMP_STRFTIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+_TIMESTAMP_MS_SUFFIX_TEMPLATE = ".{ms:03d}Z"
+_NO_TIMESTAMPED_ENTRY_LABEL = "no timestamped entry"
+_EMPTY_RESULT_NOTE_TEMPLATE = "No lines matched. Resolved log root: {log_root}. Newest entry in that root: {newest}."
+
+
+def _format_timestamp(ts: datetime) -> str:
+    """Format a timestamp the same way log lines carry theirs (ms precision, `Z`)."""
+    ms = int(ts.microsecond / 1000)
+    return ts.strftime(_TIMESTAMP_STRFTIME_FORMAT) + _TIMESTAMP_MS_SUFFIX_TEMPLATE.format(ms=ms)
 
 
 def _parse_stems(value: str) -> list[str]:
@@ -236,11 +250,21 @@ def main() -> None:
             raise SystemExit(f"No log files matched stems {stems} in app '{args.app}'. Available: {available_str}")
         raise SystemExit(f"No log files found for app '{args.app}'")
 
+    wrote_a_line = False
     for line in iter_recent_log_lines_merged(files, since):
         if _line_passes(line, keep=pattern, drop=exclude_pattern):
             sys.stdout.write(line)
+            wrote_a_line = True
 
     if not args.follow:
+        if not wrote_a_line:
+            log_root = files[0].parent
+            newest = newest_log_timestamp(files)
+            newest_desc = _format_timestamp(newest) if newest is not None else _NO_TIMESTAMPED_ENTRY_LABEL
+            print(
+                _EMPTY_RESULT_NOTE_TEMPLATE.format(log_root=log_root, newest=newest_desc),
+                file=sys.stderr,
+            )
         return
 
     sys.stdout.flush()
