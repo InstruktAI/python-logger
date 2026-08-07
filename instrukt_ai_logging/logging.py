@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, Literal, Protocol, cast, runtime_checkable
 
 # Standard logging levels are: NOTSET=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
 TRACE: int = 5
@@ -585,6 +585,94 @@ def _window_start_offset(path: Path, cutoff: datetime) -> int:
                 return start
             probe *= 2
     return 0
+
+
+_GZIP_SUFFIX = ".gz"
+_BINARY_READ_MODE: Literal["rb"] = "rb"
+_TEXT_DECODE_ENCODING = "utf-8"
+_TEXT_DECODE_ERRORS = "replace"
+
+
+def _tail_timestamp(path: Path) -> datetime | None:
+    """Return the newest parsable log timestamp near the tail of `path`, or `None`.
+
+    A log file is appended in timestamp order, so its newest entry is always at
+    the tail: probe backward in exponentially growing chunks (the same
+    `_WINDOW_PROBE_BYTES` doubling idiom `_window_start_offset` uses) until the
+    probed span holds at least one parsable timestamp, then return the last one
+    seen while scanning that span forward to EOF — ascending order makes that the
+    maximum. Falls back to a full scan only when no probe finds a timestamp at
+    all. Gzip archives have no seek and are streamed from the start; the caller's
+    mtime bound already governs whether this is called on one.
+
+    Only a vanished file (`FileNotFoundError`, the same race every sibling probe
+    in this module already tolerates) is treated as absence. A file that exists
+    but cannot be read or decompressed — permission denied, a truncated or
+    corrupt archive — propagates its exception rather than being reported as
+    holding no timestamp.
+    """
+    if path.name.endswith(_GZIP_SUFFIX):
+        newest: datetime | None = None
+        try:
+            with gzip.open(path, _BINARY_READ_MODE) as fb:
+                for raw in fb:
+                    ts = parse_log_timestamp(raw.decode(_TEXT_DECODE_ENCODING, errors=_TEXT_DECODE_ERRORS))
+                    if ts is not None:
+                        newest = ts
+        except FileNotFoundError:
+            return None
+        return newest
+
+    try:
+        size = path.stat().st_size
+    except FileNotFoundError:
+        return None
+
+    probe = _WINDOW_PROBE_BYTES
+    with path.open(_BINARY_READ_MODE) as fb:
+        while True:
+            start = max(0, size - probe)
+            fb.seek(start)
+            if start:
+                fb.readline()  # discard the partial line spanning the probe boundary
+            newest = None
+            for raw in fb:
+                ts = parse_log_timestamp(raw.decode(_TEXT_DECODE_ENCODING, errors=_TEXT_DECODE_ERRORS))
+                if ts is not None:
+                    newest = ts
+            if newest is not None or start == 0:
+                return newest
+            probe *= 2
+
+
+def newest_log_timestamp(files: Iterable[Path]) -> datetime | None:
+    """Return the newest parsable log timestamp across `files`, or `None`.
+
+    Examines files in descending mtime order. A file's entries never postdate
+    its own mtime — the bound `iter_recent_log_lines_merged` already relies on
+    to skip whole files — so once a remaining candidate's mtime can no longer
+    beat the best timestamp found so far, no later candidate can either and the
+    scan stops. A single file's mtime is not enough on its own to answer this:
+    the root holds independent per-stem streams and their rotations, so the
+    newest entry can live in a file that was not the most recently touched.
+    """
+    candidates: list[tuple[float, Path]] = []
+    for path in files:
+        try:
+            mtime = path.stat().st_mtime
+        except FileNotFoundError:
+            continue
+        candidates.append((mtime, path))
+    candidates.sort(key=lambda item: item[0], reverse=True)
+
+    best: datetime | None = None
+    for mtime, path in candidates:
+        if best is not None and datetime.fromtimestamp(mtime, tz=UTC) <= best:
+            break
+        ts = _tail_timestamp(path)
+        if ts is not None and (best is None or ts > best):
+            best = ts
+    return best
 
 
 def iter_recent_log_lines_merged(files: Iterable[Path], since: timedelta) -> Iterator[str]:
