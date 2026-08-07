@@ -37,3 +37,17 @@ Then the in-window line from the gzipped archive appears in the output
 And it is ordered by timestamp among the lines read from the live segment
 And no line from the wholly-older archive appears in the output
 ```
+
+<!-- planned:logs-cli-silent-on-stale-log-root -->
+
+#### UC-TW2: an empty result discloses the log root read and that root's newest entry
+
+```gherkin
+Given an app log directory whose every log entry predates the --since window
+When instrukt-ai-logs reads that app with that window
+Then no log lines are written to standard output
+And standard error names the log directory that was read
+And standard error reports the timestamp of the newest entry present in that directory
+```
+
+<!-- /planned:logs-cli-silent-on-stale-log-root -->
