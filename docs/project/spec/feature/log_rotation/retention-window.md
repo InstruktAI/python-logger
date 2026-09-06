@@ -1,7 +1,6 @@
 ---
-description: "Feature: how much log history the rotation assets keep — a stated archive depth, identical on both rotator backends, rather than a side effect of write volume."
-delivered_by:
-  - log-retention-window-not-guaranteed
+description: 'Feature: how much log history the rotation assets keep — a stated archive
+  depth, identical on both rotator backends, rather than a side effect of write volume.'
 ---
 
 # Log Retention Window — Spec
