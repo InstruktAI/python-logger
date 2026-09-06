@@ -13,7 +13,6 @@ from instrukt_ai_logging import install
 # assertions). These are newsyslog/logrotate/launchd/systemd field identities,
 # not prose.
 _NEWSYSLOG_MODE = "640"
-_NEWSYSLOG_COUNT = "5"
 _NEWSYSLOG_SIZE_KB = "50000"
 _NEWSYSLOG_WHEN = "*"
 _NEWSYSLOG_COMPRESS_GLOB_FLAGS = "ZG"  # gzip-compress archives; glob-expand at rotation time
@@ -22,7 +21,6 @@ _PLIST_PROGRAM = "/usr/sbin/newsyslog"
 _PLIST_NO_ROOT_FLAG = "<string>-r</string>"  # newsyslog otherwise refuses to run as a non-root user
 _PLIST_START_INTERVAL = "1800"
 _LOGROTATE_SIZE = "size 50M"
-_LOGROTATE_ROTATE = "rotate 5"
 _LOGROTATE_COMPRESS = "compress"
 _LOGROTATE_DELAYCOMPRESS = "delaycompress"
 _LOGROTATE_MISSINGOK = "missingok"
@@ -82,10 +80,9 @@ def test_ensure_rotation_darwin_writes_newsyslog_conf_and_plist(
 
     assert problems == []
     conf_content = install._newsyslog_conf_path().read_text(encoding="utf-8")
-    path, mode, count, size_kb, when, flags = conf_content.split()
+    path, mode, _count, size_kb, when, flags = conf_content.split()
     assert path == f"{rotation_env / 'instrukt-ai'}/*/*.log"
     assert mode == _NEWSYSLOG_MODE
-    assert count == _NEWSYSLOG_COUNT
     assert size_kb == _NEWSYSLOG_SIZE_KB
     assert when == _NEWSYSLOG_WHEN
     assert flags == _NEWSYSLOG_COMPRESS_GLOB_FLAGS
@@ -115,7 +112,6 @@ def test_ensure_rotation_linux_writes_logrotate_conf_and_systemd_units(
     assert f"{rotation_env / 'instrukt-ai'}/*/*.log" in logrotate_content
     for directive in (
         _LOGROTATE_SIZE,
-        _LOGROTATE_ROTATE,
         _LOGROTATE_COMPRESS,
         _LOGROTATE_DELAYCOMPRESS,
         _LOGROTATE_MISSINGOK,

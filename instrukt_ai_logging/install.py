@@ -17,6 +17,17 @@ from pathlib import Path
 _NEWSYSLOG_BIN = "/usr/sbin/newsyslog"
 _LAUNCHD_LABEL = "ai.instrukt.log-rotate"
 _SYSTEMD_UNIT_NAME = "instrukt-ai-logrotate"
+_ARCHIVE_DEPTH = 30
+_NEWSYSLOG_CONF_TEMPLATE = "{log_root}/*/*.log  640  {archive_depth}  50000  *  ZG\n"
+_LOGROTATE_CONF_TEMPLATE = """{log_root}/*/*.log {{
+    size 50M
+    rotate {archive_depth}
+    compress
+    delaycompress
+    missingok
+    notifempty
+}}
+"""
 
 
 def _state_home_root() -> Path:
@@ -55,8 +66,8 @@ def _systemd_timer_path() -> Path:
 
 
 def _newsyslog_conf(log_root: Path) -> str:
-    """One glob line: 5 gzipped archives at 50 MB, evaluated at rotation time (G flag)."""
-    return f"{log_root}/*/*.log  640  5  50000  *  ZG\n"
+    """One glob line for gzip-compressed archive retention."""
+    return _NEWSYSLOG_CONF_TEMPLATE.format(log_root=log_root, archive_depth=_ARCHIVE_DEPTH)
 
 
 def _launchd_plist(conf_path: Path) -> str:
@@ -87,15 +98,7 @@ def _launchd_plist(conf_path: Path) -> str:
 
 def _logrotate_conf(log_root: Path) -> str:
     """Default move+create rotation; WatchedFileHandler reopens on inode change."""
-    return f"""{log_root}/*/*.log {{
-    size 50M
-    rotate 5
-    compress
-    delaycompress
-    missingok
-    notifempty
-}}
-"""
+    return _LOGROTATE_CONF_TEMPLATE.format(log_root=log_root, archive_depth=_ARCHIVE_DEPTH)
 
 
 def _systemd_service(conf_path: Path, state_file: Path) -> str:
