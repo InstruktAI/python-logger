@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -32,12 +32,12 @@ jobs:
           esac
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.1.0
 
       - name: Install dev deps
         run: uv sync --group dev
@@ -64,7 +64,7 @@ jobs:
 
       - name: AI decides bump + release notes
         id: ai
-        uses: actions/ai-inference@v2
+        uses: actions/ai-inference@v3
         with:
           prompt-file: ./.github/prompts/release-bump.prompt.yml
           file_input: |
@@ -106,7 +106,7 @@ jobs:
           git push origin HEAD:main --tags
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.bump.outputs.version }}
           body_path: release-notes.md
