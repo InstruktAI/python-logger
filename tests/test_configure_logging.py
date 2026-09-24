@@ -7,9 +7,8 @@ from tempfile import TemporaryDirectory
 import pytest
 from instrukt_ai_logging import InstruktAILogger, configure_logging, get_logger
 
-# Log markers shared by each test and its assertions — named constants per
-# software-development/procedure/snapshot-testing (no bare literals in content
-# assertions). The logfmt field fragments are derived from the markers so the
+# Log markers shared by each test and its assertions — named constants (no bare literals in
+# content assertions). The logfmt field fragments are derived from the markers so the
 # expected output stays in sync with what is logged.
 _LOGGER_OURS = "teleclaude.core"
 _LOGGER_HTTPCORE = "httpcore.http11"
