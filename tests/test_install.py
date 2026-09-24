@@ -8,9 +8,8 @@ from pathlib import Path
 import pytest
 from instrukt_ai_logging import install
 
-# Protocol-significant tokens for the rotation configs — named constants (no bare literals in
-# content assertions). These are newsyslog/logrotate/launchd/systemd field identities,
-# not prose.
+# Protocol-significant tokens the rotation-config assertions check for, named as
+# constants. These are newsyslog/logrotate/launchd/systemd field identities, not prose.
 _NEWSYSLOG_MODE = "640"
 _NEWSYSLOG_SIZE_KB = "50000"
 _NEWSYSLOG_WHEN = "*"
