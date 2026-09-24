@@ -19,8 +19,8 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-# Log markers shared by each fixture and its assertions — named constants (no bare literals in
-# content assertions).
+# Log markers shared by each fixture and its assertions — named
+# constants.
 _MSG_FRESH = "fresh"
 _MSG_BOOM = "boom"
 _MSG_AFTER = "after"
