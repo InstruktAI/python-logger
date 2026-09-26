@@ -59,11 +59,16 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   script, not the Make target, is the consumer-facing entry. (Mirrors the
   itsUP `install`/`install-runtime` convention at per-user granularity.)
 
-- **Commits and CI:** TeleClaude's own git `pre-commit` hook runs `telec code
-lint` and `telec code test` directly (the `pre-commit` framework is not in
-  use here; there is no `.pre-commit-config.yaml`). A guard against hardcoded
-  `/Users/...` or `/home/...` paths in markdown runs as part of `telec code
-lint`'s guardrails lane.
+- **Commits and CI:** `telec code commit` runs format and lint in-process
+  before creating the commit (the `pre-commit` framework is not in use here;
+  there is no `.pre-commit-config.yaml`, and the git `pre-commit` hook itself
+  only guards against partially staged files). The hardcoded-HOME-path guard
+  against `/Users/...` or `/home/...` paths in markdown runs as part of that
+  same lint pass, inside `telec code lint`'s guardrails lane. Tests are not
+  gated by a git hook: TeleClaude's checkpoint system requires a test run at
+  the next turn boundary whenever changed source falls under
+  `instrukt_ai_logging/**`. CI (`release.yml`) re-runs both ruff and pytest on
+  every push.
 
 ## Rationale
 
@@ -83,9 +88,11 @@ Applies to all source files under `instrukt_ai_logging/`, all tests under
 
 ## Enforcement
 
-- `telec code lint` (ruff) via TeleClaude's git `pre-commit` hook and in CI
-  (`release.yml` runs `uv run -m ruff check .`).
-- `telec code test` (pytest) via TeleClaude's git `pre-commit` hook and in CI.
+- `telec code lint` (ruff), run in-process by `telec code commit` before
+  every commit, and again in CI (`release.yml`'s "Lint + tests" step).
+- `telec code test` (pytest), required by TeleClaude's checkpoint system at
+  the next turn boundary after a change under `instrukt_ai_logging/**`, and
+  run again in CI (`release.yml`'s "Lint + tests" step).
 - `[tool.setuptools.packages.find]` is scoped to `include = ["instrukt_ai_logging*"]`
   so accidental top-level modules cannot be packaged.
 - The hardcoded-HOME-path guardrail, run as part of `telec code lint`, blocks
