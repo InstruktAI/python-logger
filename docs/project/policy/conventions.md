@@ -81,13 +81,11 @@ Applies to all source files under `instrukt_ai_logging/`, all tests under
 
 ## Enforcement
 
-- `telec code lint` (ruff): run in-process by `telec code commit` before
-  every commit (the git `pre-commit` hook itself only guards against
-  partially staged files), and again in CI on the triggers declared in
-  `.github/workflows/release.yml`.
-- `telec code test` (pytest): required by TeleClaude's checkpoint system at
-  the next turn boundary after a change in the scope declared in
-  `teleclaude.yml`, and run again in CI on the same triggers.
+- Lint (`telec code lint`, ruff) — gated by `telec code commit`, and by CI
+  (see `.github/workflows/release.yml`).
+- Tests (`telec code test`, pytest) — gated by TeleClaude's checkpoint
+  system for the scope declared in `teleclaude.yml`, and by CI (see
+  `.github/workflows/release.yml`).
 - `[tool.setuptools.packages.find]` is scoped to `include = ["instrukt_ai_logging*"]`
   so accidental top-level modules cannot be packaged.
 - The hardcoded-HOME-path guardrail, run as part of `telec code lint`, blocks
