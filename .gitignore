@@ -32,3 +32,39 @@ CLAUDE.md
 # Blueprint engine working directory (graphify cache/output; the published
 # Blueprint lives under .teleclaude/blueprint/). Never tracked.
 graphify-out/
+
+# TeleClaude blessed defaults
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+*.bak*
+.env
+.env.local
+*.log
+logs/
+uv.*
+!uv.lock
+.venv
+*.pid
+*.db
+*.db-journal
+.playwright-mcp/
+scratchpad/
+workspace/
+trees/
+teleclaude-mcp.local.jsonc
+*.yml.lock
+.env.lock
+invitations.json.lock
+todos.db
+todos.db-wal
+todos.db-shm
+docs/global/*/domain-baseline-bundle.md
+publications/inbox/*
+!publications/inbox/.gitkeep
+.venv/
+venv/
+.coverage
+htmlcov/

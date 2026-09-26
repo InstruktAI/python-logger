@@ -1,4 +1,16 @@
-kind: project
+# yaml-language-server: $schema=.teleclaude/schemas/teleclaude-project.schema.json
 company: instrukt-ai
 business: {}
 project_slug: python-logger
+code:
+  enabled: true
+docs:
+  enabled: true
+agents:
+  enabled: false
+checkpoint:
+  code:
+    scope:
+      include:
+        - instrukt_ai_logging/**
+kind: project
