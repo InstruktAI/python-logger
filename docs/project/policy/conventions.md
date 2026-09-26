@@ -59,9 +59,11 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   script, not the Make target, is the consumer-facing entry. (Mirrors the
   itsUP `install`/`install-runtime` convention at per-user granularity.)
 
-- **Commits and CI:** Pre-commit hooks (`.pre-commit-config.yaml`) run
-  `telec code lint` and `telec code test` plus a guard against hardcoded
-  `/Users/...` or `/home/...` paths in markdown.
+- **Commits and CI:** TeleClaude's own git `pre-commit` hook runs `telec code
+lint` and `telec code test` directly (the `pre-commit` framework is not in
+  use here; there is no `.pre-commit-config.yaml`). A guard against hardcoded
+  `/Users/...` or `/home/...` paths in markdown runs as part of `telec code
+lint`'s guardrails lane.
 
 ## Rationale
 
@@ -81,13 +83,13 @@ Applies to all source files under `instrukt_ai_logging/`, all tests under
 
 ## Enforcement
 
-- `telec code lint` (ruff) on pre-commit and in CI (`release.yml` runs
-  `uv run -m ruff check .`).
-- `telec code test` (pytest) on pre-commit and in CI.
+- `telec code lint` (ruff) via TeleClaude's git `pre-commit` hook and in CI
+  (`release.yml` runs `uv run -m ruff check .`).
+- `telec code test` (pytest) via TeleClaude's git `pre-commit` hook and in CI.
 - `[tool.setuptools.packages.find]` is scoped to `include = ["instrukt_ai_logging*"]`
   so accidental top-level modules cannot be packaged.
-- The hardcoded-HOME-path hook in `.pre-commit-config.yaml` blocks commits to
-  `*.md` files containing absolute user paths.
+- The hardcoded-HOME-path guardrail, run as part of `telec code lint`, blocks
+  commits to `*.md` files containing absolute user paths.
 
 ## Exceptions
 
