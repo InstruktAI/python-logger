@@ -88,9 +88,11 @@ Applies to all source files under `instrukt_ai_logging/`, all tests under
   `.github/workflows/release.yml`).
 - `[tool.setuptools.packages.find]` is scoped to `include = ["instrukt_ai_logging*"]`
   so accidental top-level modules cannot be packaged.
-- The hardcoded-HOME-path guardrail (part of `telec code lint`) blocks
-  `*.md` commits referencing an absolute `@/Users/.../.teleclaude/...` or
-  `@/home/.../.teleclaude/...` path (see TeleClaude's `tools/lint/home_paths.py`).
+- The hardcoded-HOME-path guardrail (part of `telec code lint`) blocks a
+  `*.md` commit containing an _unescaped_ absolute home path ending in
+  `.teleclaude/...`; an `@`-escaped reference (the form this doc's own
+  TeleClaude path mentions use) is exempt (see TeleClaude's
+  `tools/lint/home_paths.py`).
 
 ## Exceptions
 
