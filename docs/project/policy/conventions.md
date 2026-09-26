@@ -59,16 +59,9 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   script, not the Make target, is the consumer-facing entry. (Mirrors the
   itsUP `install`/`install-runtime` convention at per-user granularity.)
 
-- **Commits and CI:** `telec code commit` runs format and lint in-process
-  before creating the commit (the `pre-commit` framework is not in use here;
-  there is no `.pre-commit-config.yaml`, and the git `pre-commit` hook itself
-  only guards against partially staged files). The hardcoded-HOME-path guard
-  against `/Users/...` or `/home/...` paths in markdown runs as part of that
-  same lint pass, inside `telec code lint`'s guardrails lane. Tests are not
-  gated by a git hook: TeleClaude's checkpoint system requires a test run at
-  the next turn boundary for source under the scope declared in
-  `teleclaude.yml`. CI re-runs the same checks on every push (see
-  `.github/workflows/release.yml`).
+- **Commits and CI:** No `pre-commit`-framework config exists for this
+  project; commit-time and test-turn-boundary gating are TeleClaude platform
+  mechanisms rather than project-owned tooling (see Enforcement).
 
 ## Rationale
 
@@ -88,11 +81,13 @@ Applies to all source files under `instrukt_ai_logging/`, all tests under
 
 ## Enforcement
 
-- `telec code lint` (ruff), run in-process by `telec code commit` before
-  every commit, and again in CI (`.github/workflows/release.yml`).
-- `telec code test` (pytest), required by TeleClaude's checkpoint system at
-  the next turn boundary after a change in scope, and run again in CI
-  (`.github/workflows/release.yml`).
+- `telec code lint` (ruff): run in-process by `telec code commit` before
+  every commit (the git `pre-commit` hook itself only guards against
+  partially staged files), and again in CI on the triggers declared in
+  `.github/workflows/release.yml`.
+- `telec code test` (pytest): required by TeleClaude's checkpoint system at
+  the next turn boundary after a change in the scope declared in
+  `teleclaude.yml`, and run again in CI on the same triggers.
 - `[tool.setuptools.packages.find]` is scoped to `include = ["instrukt_ai_logging*"]`
   so accidental top-level modules cannot be packaged.
 - The hardcoded-HOME-path guardrail, run as part of `telec code lint`, blocks
