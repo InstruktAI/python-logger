@@ -66,9 +66,9 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   against `/Users/...` or `/home/...` paths in markdown runs as part of that
   same lint pass, inside `telec code lint`'s guardrails lane. Tests are not
   gated by a git hook: TeleClaude's checkpoint system requires a test run at
-  the next turn boundary whenever changed source falls under
-  `instrukt_ai_logging/**`. CI (`release.yml`) re-runs both ruff and pytest on
-  every push.
+  the next turn boundary for source under the scope declared in
+  `teleclaude.yml`. CI re-runs the same checks on every push (see
+  `.github/workflows/release.yml`).
 
 ## Rationale
 
@@ -89,10 +89,10 @@ Applies to all source files under `instrukt_ai_logging/`, all tests under
 ## Enforcement
 
 - `telec code lint` (ruff), run in-process by `telec code commit` before
-  every commit, and again in CI (`release.yml`'s "Lint + tests" step).
+  every commit, and again in CI (`.github/workflows/release.yml`).
 - `telec code test` (pytest), required by TeleClaude's checkpoint system at
-  the next turn boundary after a change under `instrukt_ai_logging/**`, and
-  run again in CI (`release.yml`'s "Lint + tests" step).
+  the next turn boundary after a change in scope, and run again in CI
+  (`.github/workflows/release.yml`).
 - `[tool.setuptools.packages.find]` is scoped to `include = ["instrukt_ai_logging*"]`
   so accidental top-level modules cannot be packaged.
 - The hardcoded-HOME-path guardrail, run as part of `telec code lint`, blocks
