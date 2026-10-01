@@ -1,6 +1,7 @@
 ---
-description: 'Feature: how much log history the rotation assets keep — a stated archive
-  depth, identical on both rotator backends, rather than a side effect of write volume.'
+description:
+  "Feature: how much log history the rotation assets keep — a stated archive
+  depth, identical on both rotator backends, rather than a side effect of write volume."
 ---
 
 # Log Retention Window — Spec
@@ -93,4 +94,4 @@ And the stanza still rotates on the 50 MB size trigger
 
 ## See Also
 
-- docs/project/design/architecture.md — the rotation-ensure flow that emits these assets.
+- docs/local/design/architecture.md — the rotation-ensure flow that emits these assets.

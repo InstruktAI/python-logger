@@ -1,5 +1,5 @@
 ---
-id: "project/design/test-strategy"
+id: "projects/python-logger/design/test-strategy"
 type: "design"
 scope: "project"
 description: "Test invariants for instrukt_ai_logging: hermeticity, isolation, time budgets, one module per concern. Constraints on future tests — the suite itself is its own documentation."

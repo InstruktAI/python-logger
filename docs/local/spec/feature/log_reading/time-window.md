@@ -1,5 +1,5 @@
 ---
-id: "project/spec/feature/log_reading/time-window"
+id: "projects/python-logger/spec/feature/log_reading/time-window"
 type: "spec"
 scope: "project"
 description: "Feature: instrukt-ai-logs --since time-window retrieval returns in-window lines merged across the live segment and its rotated archives, including gzip-compressed ones."

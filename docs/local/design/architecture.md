@@ -1,5 +1,5 @@
 ---
-id: "project/design/architecture"
+id: "projects/python-logger/design/architecture"
 type: "design"
 scope: "project"
 description: "Architecture of the instrukt_ai_logging library: a stdlib-only Python package whose logging and rotation both live entirely in user space — one predictable XDG log location, rotation run as the producing user, zero root involvement."
@@ -72,14 +72,12 @@ Outputs:
   rotator invocation are per-user; rotated and recreated files therefore always
   carry the producer's ownership by construction.
 
-
 - **Retention depth is one declaration, shared by both backends.** The archive
   count emitted into the newsyslog `count` field and into the logrotate
   `rotate` directive comes from a single module-level declaration, so the two
   platforms cannot drift apart. The window it buys, and why it is bounded by
   count rather than by age, is the contract in
-  `project/spec/feature/log_rotation/retention-window`.
-
+  `projects/python-logger/spec/feature/log_rotation/retention-window`.
 
 - **One handler per process.** `configure_logging` replaces
   `logging.root.handlers` with a single `WatchedFileHandler`. Verified by
@@ -121,7 +119,6 @@ no `launchctl`/`systemctl` subprocess, on any call.
 Rotation-ensure flow (`instrukt-ai-log-setup`, run once at deploy — directly or
 via `make install-runtime`):
 
-
 ```
 derive desired conf + scheduler-unit content from the resolved log root
   → compare with what is on disk; rewrite only on drift (idempotent re-runs)
@@ -137,7 +134,6 @@ derive desired conf + scheduler-unit content from the resolved log root
     macOS launchd's EIO already-loaded bootstrap signal); problems are reported
     in the command's status output
 ```
-
 
 Read flow (`instrukt-ai-logs <app>`):
 

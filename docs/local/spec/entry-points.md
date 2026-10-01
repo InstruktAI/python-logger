@@ -1,5 +1,5 @@
 ---
-id: "project/spec/entry-points"
+id: "projects/python-logger/spec/entry-points"
 type: "spec"
 scope: "project"
 description: "Entry points exposed by instrukt_ai_logging: two console scripts (instrukt-ai-logs, instrukt-ai-log-setup) and a Python API re-exported from the package root."
