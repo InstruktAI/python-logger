@@ -1,5 +1,5 @@
 ---
-id: "projects/python-logger/spec/build-deploy"
+id: "local/projects/python-logger/spec/build-deploy"
 type: "spec"
 scope: "project"
 description: "Build and release pipeline for instruktai-python-logger: setuptools build, AI-decided semver bump on push to main, PyPI publish on tag push."

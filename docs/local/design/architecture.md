@@ -1,5 +1,5 @@
 ---
-id: "projects/python-logger/design/architecture"
+id: "local/projects/python-logger/design/architecture"
 type: "design"
 scope: "project"
 description: "Architecture of the instrukt_ai_logging library: a stdlib-only Python package whose logging and rotation both live entirely in user space — one predictable XDG log location, rotation run as the producing user, zero root involvement."
@@ -77,7 +77,7 @@ Outputs:
   `rotate` directive comes from a single module-level declaration, so the two
   platforms cannot drift apart. The window it buys, and why it is bounded by
   count rather than by age, is the contract in
-  `projects/python-logger/spec/feature/log_rotation/retention-window`.
+  `local/projects/python-logger/spec/feature/log_rotation/retention-window`.
 
 - **One handler per process.** `configure_logging` replaces
   `logging.root.handlers` with a single `WatchedFileHandler`. Verified by

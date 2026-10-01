@@ -1,5 +1,5 @@
 ---
-id: "projects/python-logger/spec/configuration"
+id: "local/projects/python-logger/spec/configuration"
 type: "spec"
 scope: "project"
 description: "Runtime configuration contract for instrukt_ai_logging: four per-app environment variables and one fixed, predictable log location — no global override."

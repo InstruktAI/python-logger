@@ -1,5 +1,5 @@
 ---
-id: "projects/python-logger/policy/conventions"
+id: "local/projects/python-logger/policy/conventions"
 type: "policy"
 scope: "project"
 description: "Code conventions observed in instrukt_ai_logging: snake_case Python with type hints, ruff formatting at line-length 120, future annotations, stdlib-only runtime."
@@ -35,7 +35,7 @@ description: "Code conventions observed in instrukt_ai_logging: snake_case Pytho
   - Format: `uv run ruff format .` (or `telec code format`).
 - **Tests:**
   - `pytest` with `addopts = "-q"` and `testpaths = ["tests"]`.
-  - One test module per source concern (see `projects/python-logger/design/test-strategy`).
+  - One test module per source concern (see `local/projects/python-logger/design/test-strategy`).
   - Run via `uv run pytest` or `telec code test`.
 - **Logging output format:** single-line logfmt-ish, ordered as
   `<UTC ms timestamp> level=... logger=... msg="..." [<sorted **kv pairs>] [exc=...]`.

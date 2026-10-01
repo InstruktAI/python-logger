@@ -1,5 +1,5 @@
 ---
-id: "projects/python-logger/spec/dependencies"
+id: "local/projects/python-logger/spec/dependencies"
 type: "spec"
 scope: "project"
 description: "Runtime and development dependencies of instruktai-python-logger. Runtime is stdlib-only by design; the dev dependency-group is pytest, ruff, pyright, and mypy."
@@ -55,7 +55,7 @@ CI-only tools (not declared in `pyproject.toml`):
 - Python interpreter: `>=3.11` (`requires-python` in `[project]`,
   `target-version = "py311"` in `[tool.ruff]`).
 - Adding a runtime dependency would change this snippet and the
-  `projects/python-logger/policy/conventions` snippet — both must be updated together.
+  `local/projects/python-logger/policy/conventions` snippet — both must be updated together.
 
 ## Known caveats
 
