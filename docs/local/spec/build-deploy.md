@@ -41,7 +41,10 @@ Release workflow (`.github/workflows/release.yml`):
 - Concurrency group `release-main` with `cancel-in-progress: false`.
 - A `push` to `main` only runs the `dispatch` job, which starts this workflow
   through `workflow_dispatch`; the inspector action does not support the push
-  event. The `inspect` and `release` jobs run only for the dispatched run.
+  event. The `inspect` and `release` jobs run only for the dispatched run,
+  which the workflow's own bot identity starts; the inspector action refuses
+  bot-started runs unless that bot is on its allowed-bots list, so only that
+  bot is listed.
 - `inspect` runs with read-only repository permission and does not
   persist the checkout credential into the workspace, because it processes
   commit-derived text. `release` needs `inspect` and holds the write
