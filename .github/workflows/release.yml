@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  models: read
   actions: write
 
 concurrency:
@@ -59,33 +58,36 @@ jobs:
           else
             git log HEAD --pretty=format:'- %s%n%b%n' > commits.txt
           fi
-          sed -e 's/^/      /' commits.txt > commits.prompt.txt
           echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: AI decides bump + release notes
-        id: ai
-        uses: actions/ai-inference@v2
+      - name: Release inspector decides bump + release notes
+        id: inspect
+        uses: anthropics/claude-code-action@2dca132ff0e0c4094ce6048b422c6915a071210b # v1.0.247
         with:
-          prompt-file: ./.github/prompts/release-bump.prompt.yml
-          file_input: |
-            commits: ./commits.prompt.txt
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            Follow .github/prompts/release-inspector.md exactly.
+            Last release tag: ${{ steps.commits.outputs.last_tag }}
+            Commit log since that tag is in commits.txt.
+          claude_args: |
+            --max-turns 20
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --json-schema '{"type":"object","properties":{"bump":{"type":"string","enum":["minor","patch"]},"breaking":{"type":"boolean"},"rationale":{"type":"string"},"notes_markdown":{"type":"string"}},"required":["bump","breaking","rationale","notes_markdown"],"additionalProperties":false}'
 
       - name: Extract bump + notes
         id: decision
         env:
-          AI_RESPONSE: ${{ steps.ai.outputs.response }}
+          INSPECTOR_RESULT: ${{ steps.inspect.outputs.structured_output }}
         run: |
           set -euo pipefail
-          # Use env var instead of templating into the shell — safe against
-          # responses with embedded newlines, quotes, or backticks.
-          printf '%s' "$AI_RESPONSE" > ai.json
-          jq -e . >/dev/null 2>&1 < ai.json
-          BUMP="$(jq -r '.bump // "minor"' ai.json)"
-          if [ "${BUMP}" != "minor" ] && [ "${BUMP}" != "patch" ]; then
-            BUMP="minor"
-          fi
-          jq -r '.notes_markdown // ""' ai.json > release-notes.md
-          echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
+          # Env var instead of templating into the shell: safe against
+          # embedded newlines, quotes, or backticks in the result.
+          printf '%s' "$INSPECTOR_RESULT" > inspector.json
+          jq -e '.bump | IN("minor", "patch")' inspector.json >/dev/null
+          jq -r '.rationale' inspector.json
+          jq -r '.notes_markdown' inspector.json > release-notes.md
+          echo "bump=$(jq -r '.bump' inspector.json)" >> "$GITHUB_OUTPUT"
 
       - name: Bump version in pyproject.toml
         id: bump
