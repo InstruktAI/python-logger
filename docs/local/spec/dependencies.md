@@ -62,9 +62,7 @@ CI-only tools (not declared in `pyproject.toml`):
 - The package keeps `py.typed` under `instrukt_ai_logging/` and declares it in
   `[tool.setuptools.package-data]` so downstream type checkers see public
   signatures. Removing it would silently break consumer type checks.
-- `__version__` is resolved in `instrukt_ai_logging/__init__.py` with a direct
-  `importlib.metadata.version()` lookup of the `instruktai-python-logger`
-  distribution; it never scans the installed distributions. When that
-  distribution is not installed (e.g. a source checkout, or the distribution
-  installed under a different name), `PackageNotFoundError` falls back to
-  `"0.0.0"`. Any other metadata error propagates.
+- `__version__` reports the installed distribution's version without scanning
+  the other installed distributions. When this package is not installed as a
+  distribution, it falls back to the placeholder owned by
+  `instrukt_ai_logging/__init__.py`; any other metadata error propagates.

@@ -78,6 +78,5 @@ CLI argument surfaces:
   rotation scheduler, and log growth is unbounded until that one-time setup
   step runs.
 
-- The `__version__` resolution catches only `PackageNotFoundError` and falls
-  back to `"0.0.0"` when the package is loaded outside an installed
-  distribution; other metadata errors propagate.
+- `__version__` falls back to a placeholder only when the package is loaded
+  outside an installed distribution; other metadata errors propagate.
