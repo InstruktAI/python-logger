@@ -2,7 +2,7 @@
 id: "local/projects/python-logger/spec/build-deploy"
 type: "spec"
 scope: "project"
-description: "Build and release pipeline for instruktai-python-logger: setuptools build, AI-decided semver bump on push to main, PyPI publish on tag push."
+description: "Build and release pipeline for instruktai-python-logger: setuptools build, inspector-decided semver bump on push to main, PyPI publish on tag push."
 ---
 
 # Build and Deploy — Spec
@@ -39,17 +39,26 @@ Release workflow (`.github/workflows/release.yml`):
 
 - Trigger: `push` to `main`, or `workflow_dispatch`.
 - Concurrency group `release-main` with `cancel-in-progress: false`.
-- Skip step bails out if the head commit subject matches `chore(release):*`
-  (prevents recursion after the bot's own release commit).
-- Steps: setup Python 3.11, set up `uv`, `uv sync --extra dev`, run
-  `uv run -m ruff check .` and `uv run -m pytest`.
-- Collects commits since the last `v*` tag, asks `actions/ai-inference@v2`
-  (with prompt at `.github/prompts/release-bump.prompt.yml`) to choose
-  `bump: minor|patch` and emit `notes_markdown`.
-- Bumps the version with `uv version --bump <bump> --frozen`, commits as
-  `chore(release): v<version>`, tags `v<version>`, pushes to `main` with
-  `--tags`, creates a GitHub Release, then dispatches `publish.yml`.
-- Required permissions: `contents: write`, `models: read`, `actions: write`.
+- Two jobs. `inspect` runs with read-only repository permission and does not
+  persist the checkout credential into the workspace, because it processes
+  commit-derived text. `release` needs `inspect` and holds the write
+  permissions (`contents: write`, `actions: write`).
+- `inspect` collects the commits since the last `v*` tag and runs the release
+  inspector (`anthropics/claude-code-action`, authenticated with the
+  `CLAUDE_CODE_OAUTH_TOKEN` secret, instructions in
+  `.github/prompts/release-inspector.md`). The inspector reads the real diff
+  against the library's public contract and returns `bump`, `breaking`,
+  `rationale` and `notes_markdown` as structured output.
+- `inspect` validates the whole result (not only `bump`) and stops the run on
+  any violation, then hands `release` the validated bump as a job output and
+  the notes as the `release-notes` artifact.
+- `release` has a skip step that bails out if the head commit subject matches
+  `chore(release):*`, then sets up Python and `uv`, installs the dev group,
+  and runs `ruff check` and `pytest`.
+- `release` bumps the version with `uv version --bump <bump> --frozen`,
+  commits as `chore(release): v<version>`, tags `v<version>`, pushes to `main`
+  with `--tags`, creates a GitHub Release from the notes artifact, then
+  dispatches `publish.yml`.
 
 Publish workflow (`.github/workflows/publish.yml`):
 
@@ -63,8 +72,9 @@ There is also a sibling `publish_token.yml` retained alongside `publish.yml`.
 
 ## Allowed values
 
-- `bump` extracted from the AI response is constrained to `minor` or `patch`;
-  any other value is forced to `minor` by the `Extract bump + notes` step.
+- `bump` from the inspector is constrained to `minor` or `patch`; any other
+  value, or a result missing a required field, fails the `inspect` job and
+  nothing is released.
 - Version is single-source-of-truth in `pyproject.toml` (`version = "0.4.4"` at
   the time of writing) and updated by `uv version --bump`.
 

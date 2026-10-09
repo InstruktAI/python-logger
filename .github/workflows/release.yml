@@ -5,17 +5,87 @@ on:
     branches: ["main"]
   workflow_dispatch: {}
 
-permissions:
-  contents: write
-  actions: write
-
 concurrency:
   group: release-main
   cancel-in-progress: false
 
 jobs:
-  release:
+  # The inspector reads commit-derived text, so it runs in its own job with a
+  # read-only token that is never persisted into the workspace. It hands the
+  # release job only a validated bump and a notes file.
+  inspect:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      bump: ${{ steps.decision.outputs.bump }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Collect commits since last tag
+        id: commits
+        run: |
+          set -euo pipefail
+          LAST_TAG="$(git tag --list 'v*' --sort=-version:refname | head -n1 || true)"
+          if [ -n "${LAST_TAG}" ]; then
+            git log "${LAST_TAG}..HEAD" --pretty=format:'- %s%n%b%n' > commits.txt
+          else
+            git log HEAD --pretty=format:'- %s%n%b%n' > commits.txt
+          fi
+          echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Release inspector decides bump + release notes
+        id: inspect
+        uses: anthropics/claude-code-action@2dca132ff0e0c4094ce6048b422c6915a071210b # v1.0.247
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            Follow .github/prompts/release-inspector.md exactly.
+            Last release tag: ${{ steps.commits.outputs.last_tag }}
+            Commit log since that tag is in commits.txt.
+          claude_args: |
+            --max-turns 20
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --json-schema '{"type":"object","properties":{"bump":{"type":"string","enum":["minor","patch"]},"breaking":{"type":"boolean"},"rationale":{"type":"string"},"notes_markdown":{"type":"string"}},"required":["bump","breaking","rationale","notes_markdown"],"additionalProperties":false}'
+
+      - name: Validate inspector result
+        id: decision
+        env:
+          INSPECTOR_RESULT: ${{ steps.inspect.outputs.structured_output }}
+        run: |
+          set -euo pipefail
+          # Env var instead of templating into the shell: safe against
+          # embedded newlines, quotes, or backticks in the result.
+          printf '%s' "$INSPECTOR_RESULT" > inspector.json
+          # The action does not validate the result against the schema, so the
+          # full contract is checked here; any violation stops the release.
+          jq -e '
+            (.bump | IN("minor", "patch"))
+            and (.breaking | type == "boolean")
+            and (.rationale | type == "string" and length > 0)
+            and (.notes_markdown | type == "string" and length > 0)
+          ' inspector.json >/dev/null
+          jq -r '.rationale' inspector.json
+          jq -r '.notes_markdown' inspector.json > release-notes.md
+          echo "bump=$(jq -r '.bump' inspector.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  release:
+    needs: inspect
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,53 +117,16 @@ jobs:
           uv run -m ruff check .
           uv run -m pytest
 
-      - name: Collect commits since last tag
-        id: commits
-        run: |
-          set -euo pipefail
-          git fetch --tags --force
-          LAST_TAG="$(git tag --list 'v*' --sort=-version:refname | head -n1 || true)"
-          if [ -n "${LAST_TAG}" ]; then
-            git log "${LAST_TAG}..HEAD" --pretty=format:'- %s%n%b%n' > commits.txt
-          else
-            git log HEAD --pretty=format:'- %s%n%b%n' > commits.txt
-          fi
-          echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Release inspector decides bump + release notes
-        id: inspect
-        uses: anthropics/claude-code-action@2dca132ff0e0c4094ce6048b422c6915a071210b # v1.0.247
+      - name: Download release notes
+        uses: actions/download-artifact@v4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ github.token }}
-          prompt: |
-            Follow .github/prompts/release-inspector.md exactly.
-            Last release tag: ${{ steps.commits.outputs.last_tag }}
-            Commit log since that tag is in commits.txt.
-          claude_args: |
-            --max-turns 20
-            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
-            --json-schema '{"type":"object","properties":{"bump":{"type":"string","enum":["minor","patch"]},"breaking":{"type":"boolean"},"rationale":{"type":"string"},"notes_markdown":{"type":"string"}},"required":["bump","breaking","rationale","notes_markdown"],"additionalProperties":false}'
-
-      - name: Extract bump + notes
-        id: decision
-        env:
-          INSPECTOR_RESULT: ${{ steps.inspect.outputs.structured_output }}
-        run: |
-          set -euo pipefail
-          # Env var instead of templating into the shell: safe against
-          # embedded newlines, quotes, or backticks in the result.
-          printf '%s' "$INSPECTOR_RESULT" > inspector.json
-          jq -e '.bump | IN("minor", "patch")' inspector.json >/dev/null
-          jq -r '.rationale' inspector.json
-          jq -r '.notes_markdown' inspector.json > release-notes.md
-          echo "bump=$(jq -r '.bump' inspector.json)" >> "$GITHUB_OUTPUT"
+          name: release-notes
 
       - name: Bump version in pyproject.toml
         id: bump
         run: |
           set -euo pipefail
-          uv version --bump "${{ steps.decision.outputs.bump }}" --frozen
+          uv version --bump "${{ needs.inspect.outputs.bump }}" --frozen
           echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
 
       - name: Commit + tag
