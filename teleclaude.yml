@@ -1,6 +1,5 @@
 # yaml-language-server: $schema=.teleclaude/schemas/teleclaude-project.schema.json
 company: instrukt-ai
-business: {}
 project_slug: python-logger
 code:
   enabled: true
@@ -12,5 +11,8 @@ checkpoint:
   code:
     scope:
       include:
-        - instrukt_ai_logging/**
+      - instrukt_ai_logging/**
 kind: project
+schema_version: 16
+project_name: InstruktAI logger
+description: Better logging for AI

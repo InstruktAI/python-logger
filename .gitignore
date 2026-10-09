@@ -68,3 +68,17 @@ publications/inbox/*
 venv/
 .coverage
 htmlcov/
+
+# TeleClaude blessed defaults
+_.swp
+_~
+_.bak_
+\*.log
+uv.\*
+_.pid
+_.db
+\*.db-journal
+\*.yml.lock
+\*_/index.yaml
+docs/global/_/domain-baseline-bundle.md
+publications/inbox/\*
