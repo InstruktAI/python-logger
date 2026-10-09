@@ -10,10 +10,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The inspector action does not support the push event, so a push only
+  # starts this same workflow through workflow_dispatch, which it supports.
+  dispatch:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the release run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run release.yml --ref main
+
   # The inspector reads commit-derived text, so it runs in its own job with a
   # read-only token that is never persisted into the workspace. It hands the
   # release job only a validated bump and a notes file.
   inspect:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
