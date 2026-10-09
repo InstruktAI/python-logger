@@ -3,6 +3,19 @@
 See `README.md` for usage and `docs/design.md` for design intent.
 """
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+from instrukt_ai_logging.logging import (
+    TRACE,
+    InstruktAILogger,
+    InstruktAILoggerProtocol,
+    configure_logging,
+    get_logger,
+    resolve_log_file,
+    resolve_log_files,
+)
+
 __all__ = [
     "TRACE",
     "InstruktAILogger",
@@ -14,21 +27,9 @@ __all__ = [
     "resolve_log_files",
 ]
 
+_DISTRIBUTION_NAME = "instruktai-python-logger"
+
 try:
-    from importlib.metadata import packages_distributions
-    from importlib.metadata import version as _pkg_version
-
-    _dists = packages_distributions().get(__name__, [])
-    __version__ = _pkg_version(_dists[0]) if _dists else "0.0.0"
-except Exception:  # pragma: no cover
+    __version__ = _pkg_version(_DISTRIBUTION_NAME)
+except PackageNotFoundError:
     __version__ = "0.0.0"
-
-from instrukt_ai_logging.logging import (
-    TRACE,
-    InstruktAILogger,
-    InstruktAILoggerProtocol,
-    configure_logging,
-    get_logger,
-    resolve_log_file,
-    resolve_log_files,
-)
